@@ -62,7 +62,11 @@ export default {
       const previous =
         prices.length >= 2 ? prices[prices.length - 2] : null;
 
-      const latestClose = Number(latest.AdjC ?? latest.C);
+      const closes = prices.map((price) =>
+        Number(price.AdjC ?? price.C)
+      );
+
+      const latestClose = closes[closes.length - 1];
 
       const previousClose = previous
         ? Number(previous.AdjC ?? previous.C)
@@ -78,6 +82,17 @@ export default {
           ? (change / previousClose) * 100
           : null;
 
+      const ma5 = calculateSMA(closes, 5);
+      const ma25 = calculateSMA(closes, 25);
+      const rsi14 = calculateRSI(closes, 14);
+
+      const judgment = createJudgment({
+        latestClose,
+        ma5,
+        ma25,
+        rsi14
+      });
+
       const recentPrices = prices
         .slice(-10)
         .reverse();
@@ -91,7 +106,11 @@ export default {
           previousClose,
           change,
           changePercent,
-          recentPrices
+          recentPrices,
+          ma5,
+          ma25,
+          rsi14,
+          judgment
         }),
         {
           headers: {
@@ -110,6 +129,119 @@ export default {
   }
 };
 
+function calculateSMA(values, period) {
+  if (values.length < period) {
+    return null;
+  }
+
+  const selected = values.slice(-period);
+  const total = selected.reduce((sum, value) => sum + value, 0);
+
+  return total / period;
+}
+
+function calculateRSI(values, period = 14) {
+  if (values.length <= period) {
+    return null;
+  }
+
+  const recent = values.slice(-(period + 1));
+
+  let gains = 0;
+  let losses = 0;
+
+  for (let i = 1; i < recent.length; i++) {
+    const difference = recent[i] - recent[i - 1];
+
+    if (difference > 0) {
+      gains += difference;
+    } else {
+      losses += Math.abs(difference);
+    }
+  }
+
+  const averageGain = gains / period;
+  const averageLoss = losses / period;
+
+  if (averageLoss === 0) {
+    return 100;
+  }
+
+  const relativeStrength = averageGain / averageLoss;
+
+  return 100 - 100 / (1 + relativeStrength);
+}
+
+function createJudgment({
+  latestClose,
+  ma5,
+  ma25,
+  rsi14
+}) {
+  let score = 50;
+  const reasons = [];
+
+  if (ma5 !== null) {
+    if (latestClose > ma5) {
+      score += 10;
+      reasons.push("株価が5日移動平均線を上回っています");
+    } else {
+      score -= 10;
+      reasons.push("株価が5日移動平均線を下回っています");
+    }
+  }
+
+  if (ma5 !== null && ma25 !== null) {
+    if (ma5 > ma25) {
+      score += 15;
+      reasons.push("5日線が25日線を上回っています");
+    } else {
+      score -= 15;
+      reasons.push("5日線が25日線を下回っています");
+    }
+  }
+
+  if (rsi14 !== null) {
+    if (rsi14 < 30) {
+      score += 15;
+      reasons.push("RSIが売られすぎ水準です");
+    } else if (rsi14 > 70) {
+      score -= 15;
+      reasons.push("RSIが買われすぎ水準です");
+    } else if (rsi14 >= 45 && rsi14 <= 65) {
+      score += 5;
+      reasons.push("RSIは比較的安定した水準です");
+    }
+  }
+
+  score = Math.max(0, Math.min(100, score));
+
+  if (score >= 70) {
+    return {
+      label: "買い寄り",
+      className: "buy",
+      score,
+      reasons
+    };
+  }
+
+  if (score >= 45) {
+    return {
+      label: "様子見",
+      className: "wait",
+      score,
+      reasons
+    };
+  }
+
+  return {
+    label: "注意",
+    className: "danger",
+    score,
+    reasons
+  };
+}
+
 function createHtml({
   stockName,
   inputCode,
@@ -118,14 +250,14 @@ function createHtml({
   previousClose,
   change,
   changePercent,
-  recentPrices
+  recentPrices,
+  ma5,
+  ma25,
+  rsi14,
+  judgment
 }) {
   const isPositive = change !== null && change >= 0;
-
-  const changeClass = isPositive
-    ? "positive"
-    : "negative";
-
+  const changeClass = isPositive ? "positive" : "negative";
   const changeSign = isPositive ? "+" : "";
 
   const rows = recentPrices
@@ -149,6 +281,10 @@ function createHtml({
     })
     .join("");
 
+  const reasonItems = judgment.reasons
+    .map((reason) => `<li>${escapeHtml(reason)}</li>`)
+    .join("");
+
   return `
 <!DOCTYPE html>
 <html lang="ja">
@@ -158,6 +294,7 @@ function createHtml({
     name="viewport"
     content="width=device-width, initial-scale=1.0"
   >
+
   <title>${escapeHtml(stockName)}｜Stock AI</title>
 
   <style>
@@ -178,7 +315,7 @@ function createHtml({
     }
 
     .container {
-      max-width: 900px;
+      max-width: 950px;
       margin: 0 auto;
     }
 
@@ -252,16 +389,18 @@ function createHtml({
       color: #ef4444;
     }
 
-    .details {
+    .details,
+    .indicator-grid {
       display: grid;
       grid-template-columns:
-        repeat(auto-fit, minmax(140px, 1fr));
+        repeat(auto-fit, minmax(145px, 1fr));
       gap: 12px;
       margin-top: 24px;
     }
 
-    .detail-item {
-      padding: 14px;
+    .detail-item,
+    .indicator-item {
+      padding: 15px;
       border-radius: 10px;
       background: #0f172a;
     }
@@ -275,6 +414,54 @@ function createHtml({
       margin-top: 5px;
       font-size: 18px;
       font-weight: bold;
+    }
+
+    .judgment {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 20px;
+      align-items: center;
+    }
+
+    .judgment-badge {
+      padding: 28px 12px;
+      border-radius: 16px;
+      text-align: center;
+    }
+
+    .judgment-label {
+      font-size: 26px;
+      font-weight: 800;
+    }
+
+    .judgment-score {
+      margin-top: 8px;
+      font-size: 17px;
+    }
+
+    .buy {
+      background: rgba(34, 197, 94, 0.18);
+      color: #4ade80;
+      border: 1px solid #22c55e;
+    }
+
+    .wait {
+      background: rgba(234, 179, 8, 0.18);
+      color: #facc15;
+      border: 1px solid #eab308;
+    }
+
+    .danger {
+      background: rgba(239, 68, 68, 0.18);
+      color: #f87171;
+      border: 1px solid #ef4444;
+    }
+
+    .reasons {
+      margin: 0;
+      padding-left: 22px;
+      line-height: 1.9;
+      color: #cbd5e1;
     }
 
     .table-wrap {
@@ -315,7 +502,7 @@ function createHtml({
       line-height: 1.7;
     }
 
-    @media (max-width: 600px) {
+    @media (max-width: 650px) {
       body {
         padding: 14px;
       }
@@ -330,6 +517,10 @@ function createHtml({
 
       .search {
         flex-direction: column;
+      }
+
+      .judgment {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -361,14 +552,16 @@ function createHtml({
       </div>
 
       <div class="change ${changeClass}">
-        ${change !== null
-          ? `${changeSign}${formatNumber(change)}円`
-          : "-"
+        ${
+          change !== null
+            ? `${changeSign}${formatNumber(change)}円`
+            : "-"
         }
 
-        ${changePercent !== null
-          ? `（${changeSign}${changePercent.toFixed(2)}%）`
-          : ""
+        ${
+          changePercent !== null
+            ? `（${changeSign}${changePercent.toFixed(2)}%）`
+            : ""
         }
       </div>
 
@@ -397,9 +590,10 @@ function createHtml({
         <div class="detail-item">
           <div class="detail-label">前日終値</div>
           <div class="detail-value">
-            ${previousClose !== null
-              ? `${formatNumber(previousClose)}円`
-              : "-"
+            ${
+              previousClose !== null
+                ? `${formatNumber(previousClose)}円`
+                : "-"
             }
           </div>
         </div>
@@ -410,6 +604,58 @@ function createHtml({
             ${formatNumber(latest.AdjVo ?? latest.Vo)}株
           </div>
         </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>テクニカル指標</h2>
+
+      <div class="indicator-grid">
+        <div class="indicator-item">
+          <div class="detail-label">5日移動平均</div>
+          <div class="detail-value">
+            ${ma5 !== null ? `${formatNumber(ma5)}円` : "-"}
+          </div>
+        </div>
+
+        <div class="indicator-item">
+          <div class="detail-label">25日移動平均</div>
+          <div class="detail-value">
+            ${ma25 !== null ? `${formatNumber(ma25)}円` : "-"}
+          </div>
+        </div>
+
+        <div class="indicator-item">
+          <div class="detail-label">RSI（14日）</div>
+          <div class="detail-value">
+            ${rsi14 !== null ? rsi14.toFixed(1) : "-"}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>簡易判定</h2>
+
+      <div class="judgment">
+        <div class="judgment-badge ${judgment.className}">
+          <div class="judgment-label">
+            ${escapeHtml(judgment.label)}
+          </div>
+
+          <div class="judgment-score">
+            判定スコア ${judgment.score}点
+          </div>
+        </div>
+
+        <ul class="reasons">
+          ${reasonItems}
+        </ul>
+      </div>
+
+      <div class="notice">
+        この判定は移動平均線とRSIだけを使った簡易評価です。
+        売買を保証するものではありません。
       </div>
     </section>
 
@@ -428,6 +674,7 @@ function createHtml({
               <th>出来高</th>
             </tr>
           </thead>
+
           <tbody>
             ${rows}
           </tbody>
@@ -436,7 +683,6 @@ function createHtml({
 
       <div class="notice">
         現在のJ-Quants契約で取得可能な日付のデータを表示しています。
-        この画面は投資判断を保証するものではありません。
       </div>
     </section>
   </main>
@@ -458,6 +704,7 @@ function htmlError(message) {
   >
   <title>エラー｜Stock AI</title>
 </head>
+
 <body
   style="
     background:#0f172a;
@@ -493,7 +740,7 @@ function formatNumber(value) {
     return "-";
   }
 
-  return number.toLocaleString("ja-JP");
+  return Math.round(number).toLocaleString("ja-JP");
 }
 
 function escapeHtml(value) {
