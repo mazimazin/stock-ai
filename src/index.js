@@ -6,7 +6,9 @@ export default {
       .trim()
       .toUpperCase();
 
-    const code = inputCode.length === 4 ? `${inputCode}0` : inputCode;
+    const code = inputCode.length === 4
+      ? `${inputCode}0`
+      : inputCode;
 
     const stockNames = {
       "285A": "キオクシアホールディングス",
@@ -15,13 +17,19 @@ export default {
       "6920": "レーザーテック",
       "8035": "東京エレクトロン",
       "7013": "IHI",
-      "7011": "三菱重工業"
+      "7011": "三菱重工業",
+      "5801": "古河電気工業",
+      "5802": "住友電気工業",
+      "5803": "フジクラ"
     };
 
-    const stockName = stockNames[inputCode] || `銘柄コード ${inputCode}`;
+    const stockName =
+      stockNames[inputCode] || `銘柄コード ${inputCode}`;
 
     if (!env.JQUANTS_API_KEY) {
-      return htmlError("JQUANTS_API_KEYが設定されていません");
+      return htmlError(
+        "JQUANTS_API_KEYが設定されていません"
+      );
     }
 
     const apiUrl = new URL(
@@ -46,7 +54,9 @@ export default {
         );
       }
 
-      const prices = Array.isArray(result.data) ? result.data : [];
+      const prices = Array.isArray(result.data)
+        ? result.data
+        : [];
 
       if (prices.length === 0) {
         return htmlError(
@@ -58,16 +68,20 @@ export default {
         (a, b) => new Date(a.Date) - new Date(b.Date)
       );
 
+      const closes = prices.map((price) =>
+        Number(price.AdjC ?? price.C)
+      );
+
+      const volumes = prices.map((price) =>
+        Number(price.AdjVo ?? price.Vo)
+      );
+
       const latest = prices[prices.length - 1];
 
       const previous =
         prices.length >= 2
           ? prices[prices.length - 2]
           : null;
-
-      const closes = prices.map((price) =>
-        Number(price.AdjC ?? price.C)
-      );
 
       const latestClose = closes[closes.length - 1];
 
@@ -89,18 +103,43 @@ export default {
       const ma25 = calculateSMA(closes, 25);
       const rsi14 = calculateRSI(closes, 14);
 
+      const macdData = calculateMACD(
+        closes,
+        12,
+        26,
+        9
+      );
+
+      const latestMacd = getLastFinite(
+        macdData.macd
+      );
+
+      const latestSignal = getLastFinite(
+        macdData.signal
+      );
+
+      const latestHistogram = getLastFinite(
+        macdData.histogram
+      );
+
       const judgment = createJudgment({
         latestClose,
         ma5,
         ma25,
-        rsi14
+        rsi14,
+        latestMacd,
+        latestSignal,
+        latestHistogram
       });
 
       const recentPrices = prices
         .slice(-10)
         .reverse();
 
-      const chartStart = Math.max(0, prices.length - 60);
+      const chartStart = Math.max(
+        0,
+        prices.length - 60
+      );
 
       const chartData = prices
         .slice(chartStart)
@@ -109,7 +148,11 @@ export default {
 
           return {
             date: price.Date,
+            open: Number(price.AdjO ?? price.O),
+            high: Number(price.AdjH ?? price.H),
+            low: Number(price.AdjL ?? price.L),
             close: closes[absoluteIndex],
+            volume: volumes[absoluteIndex],
             ma5: calculateSMAAt(
               closes,
               absoluteIndex,
@@ -119,7 +162,11 @@ export default {
               closes,
               absoluteIndex,
               25
-            )
+            ),
+            macd: macdData.macd[absoluteIndex],
+            signal: macdData.signal[absoluteIndex],
+            histogram:
+              macdData.histogram[absoluteIndex]
           };
         });
 
@@ -136,12 +183,16 @@ export default {
           ma5,
           ma25,
           rsi14,
+          latestMacd,
+          latestSignal,
+          latestHistogram,
           judgment,
           chartData
         }),
         {
           headers: {
-            "Content-Type": "text/html; charset=UTF-8",
+            "Content-Type":
+              "text/html; charset=UTF-8",
             "Cache-Control": "no-store"
           }
         }
@@ -163,12 +214,10 @@ function calculateSMA(values, period) {
 
   const selected = values.slice(-period);
 
-  const total = selected.reduce(
+  return selected.reduce(
     (sum, value) => sum + value,
     0
-  );
-
-  return total / period;
+  ) / period;
 }
 
 function calculateSMAAt(values, index, period) {
@@ -176,19 +225,15 @@ function calculateSMAAt(values, index, period) {
     return null;
   }
 
-  const start = index - period + 1;
-
   const selected = values.slice(
-    start,
+    index - period + 1,
     index + 1
   );
 
-  const total = selected.reduce(
+  return selected.reduce(
     (sum, value) => sum + value,
     0
-  );
-
-  return total / period;
+  ) / period;
 }
 
 function calculateRSI(values, period = 14) {
@@ -196,9 +241,7 @@ function calculateRSI(values, period = 14) {
     return null;
   }
 
-  const recent = values.slice(
-    -(period + 1)
-  );
+  const recent = values.slice(-(period + 1));
 
   let gains = 0;
   let losses = 0;
@@ -227,11 +270,126 @@ function calculateRSI(values, period = 14) {
   return 100 - 100 / (1 + relativeStrength);
 }
 
+function calculateEMA(values, period) {
+  const result = new Array(values.length).fill(null);
+
+  if (values.length < period) {
+    return result;
+  }
+
+  const multiplier = 2 / (period + 1);
+
+  const initialValues = values.slice(0, period);
+
+  let previousEma =
+    initialValues.reduce(
+      (sum, value) => sum + value,
+      0
+    ) / period;
+
+  result[period - 1] = previousEma;
+
+  for (let i = period; i < values.length; i++) {
+    const currentEma =
+      (values[i] - previousEma) *
+        multiplier +
+      previousEma;
+
+    result[i] = currentEma;
+    previousEma = currentEma;
+  }
+
+  return result;
+}
+
+function calculateMACD(
+  values,
+  shortPeriod = 12,
+  longPeriod = 26,
+  signalPeriod = 9
+) {
+  const shortEma = calculateEMA(
+    values,
+    shortPeriod
+  );
+
+  const longEma = calculateEMA(
+    values,
+    longPeriod
+  );
+
+  const macd = values.map((_, index) => {
+    if (
+      !Number.isFinite(shortEma[index]) ||
+      !Number.isFinite(longEma[index])
+    ) {
+      return null;
+    }
+
+    return shortEma[index] - longEma[index];
+  });
+
+  const validMacd = macd.filter(
+    Number.isFinite
+  );
+
+  const validSignal = calculateEMA(
+    validMacd,
+    signalPeriod
+  );
+
+  const signal =
+    new Array(values.length).fill(null);
+
+  let validIndex = 0;
+
+  for (let i = 0; i < macd.length; i++) {
+    if (!Number.isFinite(macd[i])) {
+      continue;
+    }
+
+    signal[i] = validSignal[validIndex];
+    validIndex++;
+  }
+
+  const histogram = macd.map(
+    (value, index) => {
+      if (
+        !Number.isFinite(value) ||
+        !Number.isFinite(signal[index])
+      ) {
+        return null;
+      }
+
+      return value - signal[index];
+    }
+  );
+
+  return {
+    macd,
+    signal,
+    histogram
+  };
+}
+
+function getLastFinite(values) {
+  for (let i = values.length - 1; i >= 0; i--) {
+    if (Number.isFinite(values[i])) {
+      return values[i];
+    }
+  }
+
+  return null;
+}
+
 function createJudgment({
   latestClose,
   ma5,
   ma25,
-  rsi14
+  rsi14,
+  latestMacd,
+  latestSignal,
+  latestHistogram
 }) {
   let score = 50;
   const reasons = [];
@@ -286,6 +444,37 @@ function createJudgment({
     }
   }
 
+  if (
+    latestMacd !== null &&
+    latestSignal !== null
+  ) {
+    if (latestMacd > latestSignal) {
+      score += 10;
+      reasons.push(
+        "MACDがシグナルを上回っています"
+      );
+    } else {
+      score -= 10;
+      reasons.push(
+        "MACDがシグナルを下回っています"
+      );
+    }
+  }
+
+  if (latestHistogram !== null) {
+    if (latestHistogram > 0) {
+      score += 5;
+      reasons.push(
+        "MACDヒストグラムはプラスです"
+      );
+    } else {
+      score -= 5;
+      reasons.push(
+        "MACDヒストグラムはマイナスです"
+      );
+    }
+  }
+
   score = Math.max(
     0,
     Math.min(100, score)
@@ -329,21 +518,20 @@ function createHtml({
   ma5,
   ma25,
   rsi14,
+  latestMacd,
+  latestSignal,
+  latestHistogram,
   judgment,
   chartData
 }) {
   const isPositive =
     change !== null && change >= 0;
 
-  const changeClass =
-    isPositive
-      ? "positive"
-      : "negative";
+  const changeClass = isPositive
+    ? "positive"
+    : "negative";
 
-  const changeSign =
-    isPositive
-      ? "+"
-      : "";
+  const changeSign = isPositive ? "+" : "";
 
   const rows = recentPrices
     .map((price) => {
@@ -400,9 +588,7 @@ function createHtml({
     content="width=device-width, initial-scale=1.0"
   >
 
-  <title>
-    ${escapeHtml(stockName)}｜Stock AI
-  </title>
+  <title>${escapeHtml(stockName)}｜Stock AI</title>
 
   <style>
     * {
@@ -470,8 +656,7 @@ function createHtml({
       border-radius: 16px;
       background: #1e293b;
       box-shadow:
-        0 12px 30px
-        rgba(0, 0, 0, 0.2);
+        0 12px 30px rgba(0, 0, 0, 0.2);
     }
 
     .date {
@@ -502,10 +687,7 @@ function createHtml({
     .indicator-grid {
       display: grid;
       grid-template-columns:
-        repeat(
-          auto-fit,
-          minmax(145px, 1fr)
-        );
+        repeat(auto-fit, minmax(145px, 1fr));
       gap: 12px;
       margin-top: 24px;
     }
@@ -563,10 +745,17 @@ function createHtml({
       color: #facc15;
     }
 
+    .legend-macd {
+      color: #60a5fa;
+    }
+
+    .legend-signal {
+      color: #f97316;
+    }
+
     .judgment {
       display: grid;
-      grid-template-columns:
-        180px 1fr;
+      grid-template-columns: 180px 1fr;
       gap: 20px;
       align-items: center;
     }
@@ -588,22 +777,19 @@ function createHtml({
     }
 
     .buy {
-      background:
-        rgba(34, 197, 94, 0.18);
+      background: rgba(34, 197, 94, 0.18);
       color: #4ade80;
       border: 1px solid #22c55e;
     }
 
     .wait {
-      background:
-        rgba(234, 179, 8, 0.18);
+      background: rgba(234, 179, 8, 0.18);
       color: #facc15;
       border: 1px solid #eab308;
     }
 
     .danger {
-      background:
-        rgba(239, 68, 68, 0.18);
+      background: rgba(239, 68, 68, 0.18);
       color: #f87171;
       border: 1px solid #ef4444;
     }
@@ -628,8 +814,7 @@ function createHtml({
     th,
     td {
       padding: 13px 10px;
-      border-bottom:
-        1px solid #334155;
+      border-bottom: 1px solid #334155;
       text-align: right;
     }
 
@@ -685,14 +870,10 @@ function createHtml({
     </h1>
 
     <div class="code">
-      証券コード：
-      ${escapeHtml(inputCode)}
+      証券コード：${escapeHtml(inputCode)}
     </div>
 
-    <form
-      class="search"
-      method="GET"
-    >
+    <form class="search" method="GET">
       <input
         type="text"
         name="code"
@@ -708,8 +889,7 @@ function createHtml({
 
     <section class="card">
       <div class="date">
-        最新取得日：
-        ${escapeHtml(latest.Date)}
+        最新取得日：${escapeHtml(latest.Date)}
       </div>
 
       <div class="price">
@@ -732,46 +912,28 @@ function createHtml({
 
       <div class="details">
         <div class="detail-item">
-          <div class="detail-label">
-            始値
-          </div>
-
+          <div class="detail-label">始値</div>
           <div class="detail-value">
-            ${formatNumber(
-              latest.AdjO ?? latest.O
-            )}円
+            ${formatNumber(latest.AdjO ?? latest.O)}円
           </div>
         </div>
 
         <div class="detail-item">
-          <div class="detail-label">
-            高値
-          </div>
-
+          <div class="detail-label">高値</div>
           <div class="detail-value">
-            ${formatNumber(
-              latest.AdjH ?? latest.H
-            )}円
+            ${formatNumber(latest.AdjH ?? latest.H)}円
           </div>
         </div>
 
         <div class="detail-item">
-          <div class="detail-label">
-            安値
-          </div>
-
+          <div class="detail-label">安値</div>
           <div class="detail-value">
-            ${formatNumber(
-              latest.AdjL ?? latest.L
-            )}円
+            ${formatNumber(latest.AdjL ?? latest.L)}円
           </div>
         </div>
 
         <div class="detail-item">
-          <div class="detail-label">
-            前日終値
-          </div>
-
+          <div class="detail-label">前日終値</div>
           <div class="detail-value">
             ${
               previousClose !== null
@@ -782,14 +944,9 @@ function createHtml({
         </div>
 
         <div class="detail-item">
-          <div class="detail-label">
-            出来高
-          </div>
-
+          <div class="detail-label">出来高</div>
           <div class="detail-value">
-            ${formatNumber(
-              latest.AdjVo ?? latest.Vo
-            )}株
+            ${formatNumber(latest.AdjVo ?? latest.Vo)}株
           </div>
         </div>
       </div>
@@ -799,17 +956,9 @@ function createHtml({
       <h2>株価チャート</h2>
 
       <div class="chart-legend">
-        <span class="legend-close">
-          ● 終値
-        </span>
-
-        <span class="legend-ma5">
-          ● 5日線
-        </span>
-
-        <span class="legend-ma25">
-          ● 25日線
-        </span>
+        <span class="legend-close">● 終値</span>
+        <span class="legend-ma5">● 5日線</span>
+        <span class="legend-ma25">● 25日線</span>
       </div>
 
       <div class="chart-wrap">
@@ -817,8 +966,36 @@ function createHtml({
       </div>
 
       <div class="notice">
-        直近最大60営業日の終値と
-        移動平均線を表示しています。
+        直近最大60営業日の終値と移動平均線を表示しています。
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>出来高</h2>
+
+      <div class="chart-wrap">
+        ${createVolumeChart(chartData)}
+      </div>
+
+      <div class="notice">
+        棒が高いほど、その日の売買が活発だったことを表します。
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>MACD</h2>
+
+      <div class="chart-legend">
+        <span class="legend-macd">● MACD</span>
+        <span class="legend-signal">● シグナル</span>
+      </div>
+
+      <div class="chart-wrap">
+        ${createMacdChart(chartData)}
+      </div>
+
+      <div class="notice">
+        MACDがシグナルを上回ると上向き、下回ると下向きの勢いを示す参考になります。
       </div>
     </section>
 
@@ -867,6 +1044,33 @@ function createHtml({
             }
           </div>
         </div>
+
+        <div class="indicator-item">
+          <div class="detail-label">MACD</div>
+          <div class="detail-value">
+            ${formatDecimal(latestMacd)}
+          </div>
+        </div>
+
+        <div class="indicator-item">
+          <div class="detail-label">
+            MACDシグナル
+          </div>
+
+          <div class="detail-value">
+            ${formatDecimal(latestSignal)}
+          </div>
+        </div>
+
+        <div class="indicator-item">
+          <div class="detail-label">
+            ヒストグラム
+          </div>
+
+          <div class="detail-value">
+            ${formatSignedDecimal(latestHistogram)}
+          </div>
+        </div>
       </div>
     </section>
 
@@ -874,21 +1078,13 @@ function createHtml({
       <h2>簡易判定</h2>
 
       <div class="judgment">
-        <div
-          class="
-            judgment-badge
-            ${judgment.className}
-          "
-        >
+        <div class="judgment-badge ${judgment.className}">
           <div class="judgment-label">
-            ${escapeHtml(
-              judgment.label
-            )}
+            ${escapeHtml(judgment.label)}
           </div>
 
           <div class="judgment-score">
-            判定スコア
-            ${judgment.score}点
+            判定スコア ${judgment.score}点
           </div>
         </div>
 
@@ -898,8 +1094,7 @@ function createHtml({
       </div>
 
       <div class="notice">
-        この判定は移動平均線と
-        RSIだけを使った簡易評価です。
+        この判定は移動平均線・RSI・MACDを使った簡易評価です。
         売買を保証するものではありません。
       </div>
     </section>
@@ -927,9 +1122,7 @@ function createHtml({
       </div>
 
       <div class="notice">
-        現在のJ-Quants契約で
-        取得可能な日付のデータを
-        表示しています。
+        現在のJ-Quants契約で取得可能な日付のデータを表示しています。
       </div>
     </section>
   </main>
@@ -939,21 +1132,18 @@ function createHtml({
 }
 
 function createPriceChart(data) {
-  if (
-    !Array.isArray(data) ||
-    data.length < 2
-  ) {
-    return `
-      <p>
-        チャートを作成できる
-        データがありません。
-      </p>
-    `;
+  const values = data.flatMap((item) => [
+    item.close,
+    item.ma5,
+    item.ma25
+  ]).filter(Number.isFinite);
+
+  if (values.length < 2) {
+    return "<p>チャートデータが不足しています。</p>";
   }
 
   const width = 900;
   const height = 360;
-
   const padding = {
     top: 25,
     right: 75,
@@ -961,58 +1151,33 @@ function createPriceChart(data) {
     left: 20
   };
 
-  const allValues = data
-    .flatMap((item) => [
-      item.close,
-      item.ma5,
-      item.ma25
-    ])
-    .filter(
-      (value) =>
-        Number.isFinite(value)
-    );
+  const rawMin = Math.min(...values);
+  const rawMax = Math.max(...values);
+  const range = rawMax - rawMin || 1;
 
-  const rawMin = Math.min(...allValues);
-  const rawMax = Math.max(...allValues);
-
-  const range =
-    rawMax - rawMin || 1;
-
-  const minValue =
-    rawMin - range * 0.08;
-
-  const maxValue =
-    rawMax + range * 0.08;
+  const minValue = rawMin - range * 0.08;
+  const maxValue = rawMax + range * 0.08;
 
   const plotWidth =
-    width -
-    padding.left -
-    padding.right;
+    width - padding.left - padding.right;
 
   const plotHeight =
-    height -
-    padding.top -
-    padding.bottom;
+    height - padding.top - padding.bottom;
 
   const x = (index) =>
     padding.left +
-    (index / (data.length - 1)) *
-      plotWidth;
+    (index / (data.length - 1)) * plotWidth;
 
   const y = (value) =>
     padding.top +
-    (
-      (maxValue - value) /
-      (maxValue - minValue)
-    ) *
+    ((maxValue - value) /
+      (maxValue - minValue)) *
       plotHeight;
 
   const makePoints = (key) =>
     data
       .map((item, index) => {
-        if (
-          !Number.isFinite(item[key])
-        ) {
+        if (!Number.isFinite(item[key])) {
           return null;
         }
 
@@ -1023,29 +1188,311 @@ function createPriceChart(data) {
       .filter(Boolean)
       .join(" ");
 
-  const closePoints =
-    makePoints("close");
+  const gridLines = createGridLines({
+    width,
+    padding,
+    minValue,
+    maxValue,
+    y,
+    formatter: (value) =>
+      Math.round(value).toLocaleString("ja-JP")
+  });
 
-  const ma5Points =
-    makePoints("ma5");
+  return `
+    <svg viewBox="0 0 ${width} ${height}">
+      ${gridLines}
+      ${createDateLabels(data, x, height)}
 
-  const ma25Points =
-    makePoints("ma25");
+      <polyline
+        points="${makePoints("close")}"
+        fill="none"
+        stroke="#e2e8f0"
+        stroke-width="3"
+        stroke-linejoin="round"
+        stroke-linecap="round"
+      />
 
-  const gridLines = [];
+      <polyline
+        points="${makePoints("ma5")}"
+        fill="none"
+        stroke="#38bdf8"
+        stroke-width="2.5"
+        stroke-linejoin="round"
+        stroke-linecap="round"
+      />
+
+      <polyline
+        points="${makePoints("ma25")}"
+        fill="none"
+        stroke="#facc15"
+        stroke-width="2.5"
+        stroke-linejoin="round"
+        stroke-linecap="round"
+      />
+    </svg>
+  `;
+}
+
+function createVolumeChart(data) {
+  if (!Array.isArray(data) || data.length === 0) {
+    return "<p>出来高データがありません。</p>";
+  }
+
+  const width = 900;
+  const height = 250;
+
+  const padding = {
+    top: 20,
+    right: 75,
+    bottom: 50,
+    left: 20
+  };
+
+  const maxVolume = Math.max(
+    ...data.map((item) => item.volume)
+  ) || 1;
+
+  const plotWidth =
+    width - padding.left - padding.right;
+
+  const plotHeight =
+    height - padding.top - padding.bottom;
+
+  const step = plotWidth / data.length;
+  const barWidth = Math.max(3, step * 0.65);
+
+  const bars = data.map((item, index) => {
+    const x =
+      padding.left +
+      index * step +
+      (step - barWidth) / 2;
+
+    const barHeight =
+      (item.volume / maxVolume) *
+      plotHeight;
+
+    const y =
+      padding.top +
+      plotHeight -
+      barHeight;
+
+    const isUp = item.close >= item.open;
+
+    const fill = isUp
+      ? "#22c55e"
+      : "#ef4444";
+
+    return `
+      <rect
+        x="${x.toFixed(1)}"
+        y="${y.toFixed(1)}"
+        width="${barWidth.toFixed(1)}"
+        height="${Math.max(1, barHeight).toFixed(1)}"
+        fill="${fill}"
+        opacity="0.8"
+      />
+    `;
+  }).join("");
+
+  const xPosition = (index) =>
+    padding.left +
+    index * step +
+    step / 2;
+
+  return `
+    <svg viewBox="0 0 ${width} ${height}">
+      <line
+        x1="${padding.left}"
+        y1="${padding.top + plotHeight}"
+        x2="${width - padding.right}"
+        y2="${padding.top + plotHeight}"
+        stroke="#334155"
+      />
+
+      <text
+        x="${width - padding.right + 8}"
+        y="${padding.top + 5}"
+        fill="#94a3b8"
+        font-size="12"
+      >
+        ${formatCompactNumber(maxVolume)}
+      </text>
+
+      ${bars}
+      ${createDateLabels(
+        data,
+        xPosition,
+        height
+      )}
+    </svg>
+  `;
+}
+
+function createMacdChart(data) {
+  const values = data.flatMap((item) => [
+    item.macd,
+    item.signal,
+    item.histogram
+  ]).filter(Number.isFinite);
+
+  if (values.length < 2) {
+    return "<p>MACDを計算できるデータが不足しています。</p>";
+  }
+
+  const width = 900;
+  const height = 320;
+
+  const padding = {
+    top: 25,
+    right: 75,
+    bottom: 50,
+    left: 20
+  };
+
+  const rawMin = Math.min(0, ...values);
+  const rawMax = Math.max(0, ...values);
+  const range = rawMax - rawMin || 1;
+
+  const minValue = rawMin - range * 0.1;
+  const maxValue = rawMax + range * 0.1;
+
+  const plotWidth =
+    width - padding.left - padding.right;
+
+  const plotHeight =
+    height - padding.top - padding.bottom;
+
+  const x = (index) =>
+    padding.left +
+    (index / (data.length - 1)) *
+      plotWidth;
+
+  const y = (value) =>
+    padding.top +
+    ((maxValue - value) /
+      (maxValue - minValue)) *
+      plotHeight;
+
+  const makePoints = (key) =>
+    data
+      .map((item, index) => {
+        if (!Number.isFinite(item[key])) {
+          return null;
+        }
+
+        return `${x(index).toFixed(1)},${y(
+          item[key]
+        ).toFixed(1)}`;
+      })
+      .filter(Boolean)
+      .join(" ");
+
+  const histogramBars = data
+    .map((item, index) => {
+      if (!Number.isFinite(item.histogram)) {
+        return "";
+      }
+
+      const step = plotWidth / data.length;
+      const barWidth = Math.max(3, step * 0.55);
+
+      const barX =
+        padding.left +
+        index * step +
+        (step - barWidth) / 2;
+
+      const zeroY = y(0);
+      const valueY = y(item.histogram);
+
+      const barY = Math.min(zeroY, valueY);
+      const barHeight = Math.abs(
+        zeroY - valueY
+      );
+
+      const fill =
+        item.histogram >= 0
+          ? "#22c55e"
+          : "#ef4444";
+
+      return `
+        <rect
+          x="${barX.toFixed(1)}"
+          y="${barY.toFixed(1)}"
+          width="${barWidth.toFixed(1)}"
+          height="${Math.max(1, barHeight).toFixed(1)}"
+          fill="${fill}"
+          opacity="0.5"
+        />
+      `;
+    })
+    .join("");
+
+  const gridLines = createGridLines({
+    width,
+    padding,
+    minValue,
+    maxValue,
+    y,
+    formatter: (value) =>
+      value.toFixed(0)
+  });
+
+  return `
+    <svg viewBox="0 0 ${width} ${height}">
+      ${gridLines}
+
+      <line
+        x1="${padding.left}"
+        y1="${y(0)}"
+        x2="${width - padding.right}"
+        y2="${y(0)}"
+        stroke="#64748b"
+        stroke-width="1.5"
+      />
+
+      ${histogramBars}
+
+      <polyline
+        points="${makePoints("macd")}"
+        fill="none"
+        stroke="#60a5fa"
+        stroke-width="2.5"
+        stroke-linejoin="round"
+        stroke-linecap="round"
+      />
+
+      <polyline
+        points="${makePoints("signal")}"
+        fill="none"
+        stroke="#f97316"
+        stroke-width="2.5"
+        stroke-linejoin="round"
+        stroke-linecap="round"
+      />
+
+      ${createDateLabels(data, x, height)}
+    </svg>
+  `;
+}
+
+function createGridLines({
+  width,
+  padding,
+  minValue,
+  maxValue,
+  y,
+  formatter
+}) {
+  const lines = [];
 
   for (let i = 0; i <= 4; i++) {
-    const gridValue =
+    const value =
       maxValue -
-      (
-        (maxValue - minValue) / 4
-      ) *
-        i;
+      ((maxValue - minValue) / 4) * i;
 
-    const gridY =
-      y(gridValue);
+    const gridY = y(value);
 
-    gridLines.push(`
+    lines.push(`
       <line
         x1="${padding.left}"
         y1="${gridY}"
@@ -1061,19 +1508,21 @@ function createPriceChart(data) {
         fill="#94a3b8"
         font-size="12"
       >
-        ${Math.round(
-          gridValue
-        ).toLocaleString("ja-JP")}
+        ${formatter(value)}
       </text>
     `);
   }
 
+  return lines.join("");
+}
+
+function createDateLabels(data, x, height) {
   const interval = Math.max(
     1,
     Math.floor(data.length / 6)
   );
 
-  const dateLabels = data
+  return data
     .map((item, index) => {
       if (
         index % interval !== 0 &&
@@ -1090,54 +1539,11 @@ function createPriceChart(data) {
           font-size="11"
           text-anchor="middle"
         >
-          ${escapeHtml(
-            item.date.slice(5)
-          )}
+          ${escapeHtml(item.date.slice(5))}
         </text>
       `;
     })
     .join("");
-
-  return `
-    <svg
-      viewBox="0 0 ${width} ${height}"
-      role="img"
-      aria-label="
-        終値と移動平均線の株価チャート
-      "
-    >
-      ${gridLines.join("")}
-
-      <polyline
-        points="${closePoints}"
-        fill="none"
-        stroke="#e2e8f0"
-        stroke-width="3"
-        stroke-linejoin="round"
-        stroke-linecap="round"
-      />
-
-      <polyline
-        points="${ma5Points}"
-        fill="none"
-        stroke="#38bdf8"
-        stroke-width="2.5"
-        stroke-linejoin="round"
-        stroke-linecap="round"
-      />
-
-      <polyline
-        points="${ma25Points}"
-        fill="none"
-        stroke="#facc15"
-        stroke-width="2.5"
-        stroke-linejoin="round"
-        stroke-linecap="round"
-      />
-
-      ${dateLabels}
-    </svg>
-  `;
 }
 
 function htmlError(message) {
@@ -1147,18 +1553,11 @@ function htmlError(message) {
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-
   <meta
     name="viewport"
-    content="
-      width=device-width,
-      initial-scale=1.0
-    "
+    content="width=device-width, initial-scale=1.0"
   >
-
-  <title>
-    エラー｜Stock AI
-  </title>
+  <title>エラー｜Stock AI</title>
 </head>
 
 <body
@@ -1169,19 +1568,11 @@ function htmlError(message) {
     padding:30px;
   "
 >
-  <h1>
-    データ取得エラー
-  </h1>
+  <h1>データ取得エラー</h1>
+  <p>${escapeHtml(message)}</p>
 
   <p>
-    ${escapeHtml(message)}
-  </p>
-
-  <p>
-    <a
-      href="/"
-      style="color:#60a5fa;"
-    >
+    <a href="/" style="color:#60a5fa;">
       トップへ戻る
     </a>
   </p>
@@ -1193,8 +1584,7 @@ function htmlError(message) {
       headers: {
         "Content-Type":
           "text/html; charset=UTF-8",
-        "Cache-Control":
-          "no-store"
+        "Cache-Control": "no-store"
       }
     }
   );
@@ -1209,6 +1599,42 @@ function formatNumber(value) {
 
   return Math.round(number)
     .toLocaleString("ja-JP");
+}
+
+function formatDecimal(value) {
+  if (!Number.isFinite(value)) {
+    return "-";
+  }
+
+  return value.toFixed(2);
+}
+
+function formatSignedDecimal(value) {
+  if (!Number.isFinite(value)) {
+    return "-";
+  }
+
+  const sign = value >= 0 ? "+" : "";
+
+  return `${sign}${value.toFixed(2)}`;
+}
+
+function formatCompactNumber(value) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return "-";
+  }
+
+  if (number >= 100000000) {
+    return `${(number / 100000000).toFixed(1)}億`;
+  }
+
+  if (number >= 10000) {
+    return `${(number / 10000).toFixed(0)}万`;
+  }
+
+  return number.toLocaleString("ja-JP");
 }
 
 function escapeHtml(value) {
