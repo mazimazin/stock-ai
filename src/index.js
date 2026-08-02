@@ -124,7 +124,35 @@ export default {
 
       const ma5 = calculateSMA(closes, 5);
       const ma25 = calculateSMA(closes, 25);
+      const ma75 = calculateSMA(closes, 75);
+      const ma200 = calculateSMA(closes, 200);
       const rsi14 = calculateRSI(closes, 14);
+
+      const bollinger = calculateBollingerBands(
+        closes,
+        20,
+        2
+      );
+
+      const averageVolume20 = calculateSMA(
+        volumes,
+        20
+      );
+
+      const latestVolume =
+        volumes[volumes.length - 1];
+
+      const volumeRatio =
+        Number.isFinite(averageVolume20) &&
+        averageVolume20 > 0
+          ? latestVolume / averageVolume20
+          : null;
+
+      const crossSignal = detectMovingAverageCross(
+        closes,
+        5,
+        25
+      );
 
       const atr14 = calculateATR(
         highs,
@@ -157,7 +185,12 @@ export default {
         latestClose,
         ma5,
         ma25,
+        ma75,
+        ma200,
         rsi14,
+        bollinger,
+        volumeRatio,
+        crossSignal,
         atr14,
         latestMacd,
         latestSignal,
@@ -199,6 +232,22 @@ export default {
               absoluteIndex,
               25
             ),
+            ma75: calculateSMAAt(
+              closes,
+              absoluteIndex,
+              75
+            ),
+            ma200: calculateSMAAt(
+              closes,
+              absoluteIndex,
+              200
+            ),
+            bollinger: calculateBollingerAt(
+              closes,
+              absoluteIndex,
+              20,
+              2
+            ),
             macd:
               macdData.macd[absoluteIndex],
             signal:
@@ -220,7 +269,13 @@ export default {
           recentPrices,
           ma5,
           ma25,
+          ma75,
+          ma200,
           rsi14,
+          bollinger,
+          averageVolume20,
+          volumeRatio,
+          crossSignal,
           atr14,
           latestMacd,
           latestSignal,
@@ -279,6 +334,157 @@ function calculateSMAAt(values, index, period) {
       0
     ) / period
   );
+}
+
+function calculateStandardDeviation(values) {
+  if (!values.length) {
+    return null;
+  }
+
+  const average =
+    values.reduce(
+      (sum, value) => sum + value,
+      0
+    ) / values.length;
+
+  const variance =
+    values.reduce(
+      (sum, value) =>
+        sum + Math.pow(value - average, 2),
+      0
+    ) / values.length;
+
+  return Math.sqrt(variance);
+}
+
+function calculateBollingerBands(
+  values,
+  period = 20,
+  multiplier = 2
+) {
+  if (values.length < period) {
+    return {
+      middle: null,
+      upper: null,
+      lower: null,
+      bandwidth: null,
+      percentB: null
+    };
+  }
+
+  const selected = values.slice(-period);
+  const middle = calculateSMA(values, period);
+  const deviation = calculateStandardDeviation(
+    selected
+  );
+
+  const upper =
+    middle + deviation * multiplier;
+  const lower =
+    middle - deviation * multiplier;
+
+  const latest = values[values.length - 1];
+  const width = upper - lower;
+
+  return {
+    middle,
+    upper,
+    lower,
+    bandwidth:
+      middle !== 0
+        ? (width / middle) * 100
+        : null,
+    percentB:
+      width !== 0
+        ? ((latest - lower) / width) * 100
+        : null
+  };
+}
+
+function calculateBollingerAt(
+  values,
+  index,
+  period = 20,
+  multiplier = 2
+) {
+  if (index + 1 < period) {
+    return {
+      middle: null,
+      upper: null,
+      lower: null
+    };
+  }
+
+  const selected = values.slice(
+    index - period + 1,
+    index + 1
+  );
+
+  const middle =
+    selected.reduce(
+      (sum, value) => sum + value,
+      0
+    ) / period;
+
+  const deviation =
+    calculateStandardDeviation(selected);
+
+  return {
+    middle,
+    upper: middle + deviation * multiplier,
+    lower: middle - deviation * multiplier
+  };
+}
+
+function detectMovingAverageCross(
+  values,
+  shortPeriod = 5,
+  longPeriod = 25
+) {
+  if (values.length < longPeriod + 2) {
+    return "none";
+  }
+
+  const currentShort =
+    calculateSMAAt(
+      values,
+      values.length - 1,
+      shortPeriod
+    );
+  const currentLong =
+    calculateSMAAt(
+      values,
+      values.length - 1,
+      longPeriod
+    );
+  const previousShort =
+    calculateSMAAt(
+      values,
+      values.length - 2,
+      shortPeriod
+    );
+  const previousLong =
+    calculateSMAAt(
+      values,
+      values.length - 2,
+      longPeriod
+    );
+
+  if (
+    previousShort <= previousLong &&
+    currentShort > currentLong
+  ) {
+    return "golden";
+  }
+
+  if (
+    previousShort >= previousLong &&
+    currentShort < currentLong
+  ) {
+    return "dead";
+  }
+
+  return "none";
 }
 
 function calculateRSI(values, period = 14) {
@@ -503,7 +709,12 @@ function createStrategy({
   latestClose,
   ma5,
   ma25,
+  ma75,
+  ma200,
   rsi14,
+  bollinger,
+  volumeRatio,
+  crossSignal,
   atr14,
   latestMacd,
   latestSignal,
@@ -570,6 +781,88 @@ function createStrategy({
     cautions.push(
       "5日線が25日線を下回っています"
     );
+  }
+
+  if (
+    Number.isFinite(ma25) &&
+    Number.isFinite(ma75)
+  ) {
+    if (ma25 > ma75) {
+      score += 10;
+      reasons.push(
+        "25日線が75日線を上回る中期上昇トレンドです"
+      );
+    } else {
+      score -= 10;
+      cautions.push(
+        "25日線が75日線を下回る中期弱気形です"
+      );
+    }
+  }
+
+  if (
+    Number.isFinite(ma200)
+  ) {
+    if (latestClose > ma200) {
+      score += 5;
+      reasons.push(
+        "株価は200日線を上回り長期基調は良好です"
+      );
+    } else {
+      score -= 5;
+      cautions.push(
+        "株価は200日線を下回っています"
+      );
+    }
+  }
+
+  if (crossSignal === "golden") {
+    score += 10;
+    reasons.push(
+      "5日線と25日線のゴールデンクロスが発生しました"
+    );
+  } else if (crossSignal === "dead") {
+    score -= 10;
+    cautions.push(
+      "5日線と25日線のデッドクロスが発生しました"
+    );
+  }
+
+  if (Number.isFinite(volumeRatio)) {
+    if (volumeRatio >= 2) {
+      score += 10;
+      reasons.push(
+        `出来高が20日平均の${volumeRatio.toFixed(1)}倍に急増しています`
+      );
+    } else if (volumeRatio >= 1.3) {
+      score += 5;
+      reasons.push(
+        `出来高が20日平均の${volumeRatio.toFixed(1)}倍です`
+      );
+    } else if (volumeRatio < 0.7) {
+      score -= 5;
+      cautions.push(
+        "出来高が20日平均を大きく下回っています"
+      );
+    }
+  }
+
+  if (
+    bollinger &&
+    Number.isFinite(bollinger.upper) &&
+    Number.isFinite(bollinger.lower)
+  ) {
+    if (latestClose > bollinger.upper) {
+      score -= 8;
+      cautions.push(
+        "株価がボリンジャーバンド+2σを上回り、短期的な行き過ぎに注意が必要です"
+      );
+    } else if (latestClose < bollinger.lower) {
+      score += 3;
+      cautions.push(
+        "株価がボリンジャーバンド-2σを下回っています。反発余地はありますが下落継続にも注意が必要です"
+      );
+    }
   }
 
   if (overheated) {
@@ -798,7 +1091,13 @@ function createHtml({
   recentPrices,
   ma5,
   ma25,
+  ma75,
+  ma200,
   rsi14,
+  bollinger,
+  averageVolume20,
+  volumeRatio,
+  crossSignal,
   atr14,
   latestMacd,
   latestSignal,
@@ -1044,6 +1343,18 @@ function createHtml({
 
     .legend-ma25 {
       color: #facc15;
+    }
+
+    .legend-ma75 {
+      color: #a855f7;
+    }
+
+    .legend-ma200 {
+      color: #fb7185;
+    }
+
+    .legend-bollinger {
+      color: #94a3b8;
     }
 
     .legend-macd {
@@ -1498,6 +1809,18 @@ function createHtml({
         <span class="legend-ma25">
           ● 25日線
         </span>
+
+        <span class="legend-ma75">
+          ● 75日線
+        </span>
+
+        <span class="legend-ma200">
+          ● 200日線
+        </span>
+
+        <span class="legend-bollinger">
+          ┄ ボリンジャーバンド ±2σ
+        </span>
       </div>
 
       <div class="chart-wrap">
@@ -1543,6 +1866,48 @@ function createHtml({
         ${detailBox(
           "25日移動平均",
           `${formatNumber(ma25)}円`
+        )}
+
+        ${detailBox(
+          "75日移動平均",
+          `${formatNumber(ma75)}円`
+        )}
+
+        ${detailBox(
+          "200日移動平均",
+          `${formatNumber(ma200)}円`
+        )}
+
+        ${detailBox(
+          "ボリンジャー上限（+2σ）",
+          `${formatNumber(bollinger.upper)}円`
+        )}
+
+        ${detailBox(
+          "ボリンジャー中心線",
+          `${formatNumber(bollinger.middle)}円`
+        )}
+
+        ${detailBox(
+          "ボリンジャー下限（-2σ）",
+          `${formatNumber(bollinger.lower)}円`
+        )}
+
+        ${detailBox(
+          "出来高20日平均",
+          `${formatNumber(averageVolume20)}株`
+        )}
+
+        ${detailBox(
+          "出来高倍率",
+          Number.isFinite(volumeRatio)
+            ? `${volumeRatio.toFixed(2)}倍`
+            : "-"
+        )}
+
+        ${detailBox(
+          "移動平均クロス",
+          formatCrossSignal(crossSignal)
         )}
 
         ${detailBox(
@@ -1650,7 +2015,11 @@ function createPriceChart(data) {
     .flatMap((item) => [
       item.close,
       item.ma5,
-      item.ma25
+      item.ma25,
+      item.ma75,
+      item.ma200,
+      item.bollinger?.upper,
+      item.bollinger?.lower
     ])
     .filter(Number.isFinite);
 
@@ -1770,8 +2139,62 @@ function createPriceChart(data) {
         stroke="#facc15"
         stroke-width="2.5"
       />
+
+      <polyline
+        points="${makePoints("ma75")}"
+        fill="none"
+        stroke="#a855f7"
+        stroke-width="2.2"
+      />
+
+      <polyline
+        points="${makePoints("ma200")}"
+        fill="none"
+        stroke="#fb7185"
+        stroke-width="2.2"
+      />
+
+      <polyline
+        points="${makeNestedPoints(data, x, y, "bollinger", "upper")}"
+        fill="none"
+        stroke="#94a3b8"
+        stroke-width="1.4"
+        stroke-dasharray="6 5"
+      />
+
+      <polyline
+        points="${makeNestedPoints(data, x, y, "bollinger", "lower")}"
+        fill="none"
+        stroke="#94a3b8"
+        stroke-width="1.4"
+        stroke-dasharray="6 5"
+      />
     </svg>
   `;
+}
+
+function makeNestedPoints(
+  data,
+  x,
+  y,
+  parentKey,
+  childKey
+) {
+  return data
+    .map((item, index) => {
+      const value =
+        item[parentKey]?.[childKey];
+
+      if (!Number.isFinite(value)) {
+        return null;
+      }
+
+      return `${x(index).toFixed(1)},${y(
+        value
+      ).toFixed(1)}`;
+    })
+    .filter(Boolean)
+    .join(" " );
 }
 
 function createVolumeChart(data) {
@@ -2165,6 +2588,18 @@ function formatRatio(value) {
   return value.toFixed(2);
 }
 
+function formatCrossSignal(value) {
+  if (value === "golden") {
+    return "ゴールデンクロス発生";
+  }
+
+  if (value === "dead") {
+    return "デッドクロス発生";
+  }
+
+  return "新規クロスなし";
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -2172,4 +2607,3 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
-}
