@@ -59,8 +59,11 @@ export default {
       );
 
       const latest = prices[prices.length - 1];
+
       const previous =
-        prices.length >= 2 ? prices[prices.length - 2] : null;
+        prices.length >= 2
+          ? prices[prices.length - 2]
+          : null;
 
       const closes = prices.map((price) =>
         Number(price.AdjC ?? price.C)
@@ -97,6 +100,29 @@ export default {
         .slice(-10)
         .reverse();
 
+      const chartStart = Math.max(0, prices.length - 60);
+
+      const chartData = prices
+        .slice(chartStart)
+        .map((price, index) => {
+          const absoluteIndex = chartStart + index;
+
+          return {
+            date: price.Date,
+            close: closes[absoluteIndex],
+            ma5: calculateSMAAt(
+              closes,
+              absoluteIndex,
+              5
+            ),
+            ma25: calculateSMAAt(
+              closes,
+              absoluteIndex,
+              25
+            )
+          };
+        });
+
       return new Response(
         createHtml({
           stockName,
@@ -110,7 +136,8 @@ export default {
           ma5,
           ma25,
           rsi14,
-          judgment
+          judgment,
+          chartData
         }),
         {
           headers: {
@@ -135,7 +162,31 @@ function calculateSMA(values, period) {
   }
 
   const selected = values.slice(-period);
-  const total = selected.reduce((sum, value) => sum + value, 0);
+
+  const total = selected.reduce(
+    (sum, value) => sum + value,
+    0
+  );
+
+  return total / period;
+}
+
+function calculateSMAAt(values, index, period) {
+  if (index + 1 < period) {
+    return null;
+  }
+
+  const start = index - period + 1;
+
+  const selected = values.slice(
+    start,
+    index + 1
+  );
+
+  const total = selected.reduce(
+    (sum, value) => sum + value,
+    0
+  );
 
   return total / period;
 }
@@ -145,13 +196,16 @@ function calculateRSI(values, period = 14) {
     return null;
   }
 
-  const recent = values.slice(-(period + 1));
+  const recent = values.slice(
+    -(period + 1)
+  );
 
   let gains = 0;
   let losses = 0;
 
   for (let i = 1; i < recent.length; i++) {
-    const difference = recent[i] - recent[i - 1];
+    const difference =
+      recent[i] - recent[i - 1];
 
     if (difference > 0) {
       gains += difference;
@@ -167,7 +221,8 @@ function calculateRSI(values, period = 14) {
     return 100;
   }
 
-  const relativeStrength = averageGain / averageLoss;
+  const relativeStrength =
+    averageGain / averageLoss;
 
   return 100 - 100 / (1 + relativeStrength);
 }
@@ -184,37 +239,57 @@ function createJudgment({
   if (ma5 !== null) {
     if (latestClose > ma5) {
       score += 10;
-      reasons.push("株価が5日移動平均線を上回っています");
+      reasons.push(
+        "株価が5日移動平均線を上回っています"
+      );
     } else {
       score -= 10;
-      reasons.push("株価が5日移動平均線を下回っています");
+      reasons.push(
+        "株価が5日移動平均線を下回っています"
+      );
     }
   }
 
   if (ma5 !== null && ma25 !== null) {
     if (ma5 > ma25) {
       score += 15;
-      reasons.push("5日線が25日線を上回っています");
+      reasons.push(
+        "5日線が25日線を上回っています"
+      );
     } else {
       score -= 15;
-      reasons.push("5日線が25日線を下回っています");
+      reasons.push(
+        "5日線が25日線を下回っています"
+      );
     }
   }
 
   if (rsi14 !== null) {
     if (rsi14 < 30) {
       score += 15;
-      reasons.push("RSIが売られすぎ水準です");
+      reasons.push(
+        "RSIが売られすぎ水準です"
+      );
     } else if (rsi14 > 70) {
       score -= 15;
-      reasons.push("RSIが買われすぎ水準です");
-    } else if (rsi14 >= 45 && rsi14 <= 65) {
+      reasons.push(
+        "RSIが買われすぎ水準です"
+      );
+    } else if (
+      rsi14 >= 45 &&
+      rsi14 <= 65
+    ) {
       score += 5;
-      reasons.push("RSIは比較的安定した水準です");
+      reasons.push(
+        "RSIは比較的安定した水準です"
+      );
     }
   }
 
-  score = Math.max(0, Math.min(100, score));
+  score = Math.max(
+    0,
+    Math.min(100, score)
+  );
 
   if (score >= 70) {
     return {
@@ -254,19 +329,43 @@ function createHtml({
   ma5,
   ma25,
   rsi14,
-  judgment
+  judgment,
+  chartData
 }) {
-  const isPositive = change !== null && change >= 0;
-  const changeClass = isPositive ? "positive" : "negative";
-  const changeSign = isPositive ? "+" : "";
+  const isPositive =
+    change !== null && change >= 0;
+
+  const changeClass =
+    isPositive
+      ? "positive"
+      : "negative";
+
+  const changeSign =
+    isPositive
+      ? "+"
+      : "";
 
   const rows = recentPrices
     .map((price) => {
-      const open = Number(price.AdjO ?? price.O);
-      const high = Number(price.AdjH ?? price.H);
-      const low = Number(price.AdjL ?? price.L);
-      const close = Number(price.AdjC ?? price.C);
-      const volume = Number(price.AdjVo ?? price.Vo);
+      const open = Number(
+        price.AdjO ?? price.O
+      );
+
+      const high = Number(
+        price.AdjH ?? price.H
+      );
+
+      const low = Number(
+        price.AdjL ?? price.L
+      );
+
+      const close = Number(
+        price.AdjC ?? price.C
+      );
+
+      const volume = Number(
+        price.AdjVo ?? price.Vo
+      );
 
       return `
         <tr>
@@ -274,7 +373,9 @@ function createHtml({
           <td>${formatNumber(open)}</td>
           <td>${formatNumber(high)}</td>
           <td>${formatNumber(low)}</td>
-          <td class="close">${formatNumber(close)}</td>
+          <td class="close">
+            ${formatNumber(close)}
+          </td>
           <td>${formatNumber(volume)}</td>
         </tr>
       `;
@@ -282,7 +383,10 @@ function createHtml({
     .join("");
 
   const reasonItems = judgment.reasons
-    .map((reason) => `<li>${escapeHtml(reason)}</li>`)
+    .map(
+      (reason) =>
+        `<li>${escapeHtml(reason)}</li>`
+    )
     .join("");
 
   return `
@@ -290,12 +394,15 @@ function createHtml({
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
+
   <meta
     name="viewport"
     content="width=device-width, initial-scale=1.0"
   >
 
-  <title>${escapeHtml(stockName)}｜Stock AI</title>
+  <title>
+    ${escapeHtml(stockName)}｜Stock AI
+  </title>
 
   <style>
     * {
@@ -362,7 +469,9 @@ function createHtml({
       border: 1px solid #334155;
       border-radius: 16px;
       background: #1e293b;
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+      box-shadow:
+        0 12px 30px
+        rgba(0, 0, 0, 0.2);
     }
 
     .date {
@@ -393,7 +502,10 @@ function createHtml({
     .indicator-grid {
       display: grid;
       grid-template-columns:
-        repeat(auto-fit, minmax(145px, 1fr));
+        repeat(
+          auto-fit,
+          minmax(145px, 1fr)
+        );
       gap: 12px;
       margin-top: 24px;
     }
@@ -416,9 +528,45 @@ function createHtml({
       font-weight: bold;
     }
 
+    .chart-wrap {
+      width: 100%;
+      margin-top: 18px;
+      overflow-x: auto;
+      border-radius: 12px;
+      background: #0f172a;
+    }
+
+    .chart-wrap svg {
+      display: block;
+      width: 100%;
+      min-width: 700px;
+      height: auto;
+    }
+
+    .chart-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+      color: #cbd5e1;
+      font-size: 14px;
+    }
+
+    .legend-close {
+      color: #e2e8f0;
+    }
+
+    .legend-ma5 {
+      color: #38bdf8;
+    }
+
+    .legend-ma25 {
+      color: #facc15;
+    }
+
     .judgment {
       display: grid;
-      grid-template-columns: 180px 1fr;
+      grid-template-columns:
+        180px 1fr;
       gap: 20px;
       align-items: center;
     }
@@ -440,19 +588,22 @@ function createHtml({
     }
 
     .buy {
-      background: rgba(34, 197, 94, 0.18);
+      background:
+        rgba(34, 197, 94, 0.18);
       color: #4ade80;
       border: 1px solid #22c55e;
     }
 
     .wait {
-      background: rgba(234, 179, 8, 0.18);
+      background:
+        rgba(234, 179, 8, 0.18);
       color: #facc15;
       border: 1px solid #eab308;
     }
 
     .danger {
-      background: rgba(239, 68, 68, 0.18);
+      background:
+        rgba(239, 68, 68, 0.18);
       color: #f87171;
       border: 1px solid #ef4444;
     }
@@ -477,7 +628,8 @@ function createHtml({
     th,
     td {
       padding: 13px 10px;
-      border-bottom: 1px solid #334155;
+      border-bottom:
+        1px solid #334155;
       text-align: right;
     }
 
@@ -528,10 +680,19 @@ function createHtml({
 
 <body>
   <main class="container">
-    <h1 class="title">${escapeHtml(stockName)}</h1>
-    <div class="code">証券コード：${escapeHtml(inputCode)}</div>
+    <h1 class="title">
+      ${escapeHtml(stockName)}
+    </h1>
 
-    <form class="search" method="GET">
+    <div class="code">
+      証券コード：
+      ${escapeHtml(inputCode)}
+    </div>
+
+    <form
+      class="search"
+      method="GET"
+    >
       <input
         type="text"
         name="code"
@@ -539,12 +700,16 @@ function createHtml({
         placeholder="例：285A、6857"
         maxlength="5"
       >
-      <button type="submit">株価を表示</button>
+
+      <button type="submit">
+        株価を表示
+      </button>
     </form>
 
     <section class="card">
       <div class="date">
-        最新取得日：${escapeHtml(latest.Date)}
+        最新取得日：
+        ${escapeHtml(latest.Date)}
       </div>
 
       <div class="price">
@@ -567,28 +732,46 @@ function createHtml({
 
       <div class="details">
         <div class="detail-item">
-          <div class="detail-label">始値</div>
+          <div class="detail-label">
+            始値
+          </div>
+
           <div class="detail-value">
-            ${formatNumber(latest.AdjO ?? latest.O)}円
+            ${formatNumber(
+              latest.AdjO ?? latest.O
+            )}円
           </div>
         </div>
 
         <div class="detail-item">
-          <div class="detail-label">高値</div>
+          <div class="detail-label">
+            高値
+          </div>
+
           <div class="detail-value">
-            ${formatNumber(latest.AdjH ?? latest.H)}円
+            ${formatNumber(
+              latest.AdjH ?? latest.H
+            )}円
           </div>
         </div>
 
         <div class="detail-item">
-          <div class="detail-label">安値</div>
+          <div class="detail-label">
+            安値
+          </div>
+
           <div class="detail-value">
-            ${formatNumber(latest.AdjL ?? latest.L)}円
+            ${formatNumber(
+              latest.AdjL ?? latest.L
+            )}円
           </div>
         </div>
 
         <div class="detail-item">
-          <div class="detail-label">前日終値</div>
+          <div class="detail-label">
+            前日終値
+          </div>
+
           <div class="detail-value">
             ${
               previousClose !== null
@@ -599,11 +782,43 @@ function createHtml({
         </div>
 
         <div class="detail-item">
-          <div class="detail-label">出来高</div>
+          <div class="detail-label">
+            出来高
+          </div>
+
           <div class="detail-value">
-            ${formatNumber(latest.AdjVo ?? latest.Vo)}株
+            ${formatNumber(
+              latest.AdjVo ?? latest.Vo
+            )}株
           </div>
         </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>株価チャート</h2>
+
+      <div class="chart-legend">
+        <span class="legend-close">
+          ● 終値
+        </span>
+
+        <span class="legend-ma5">
+          ● 5日線
+        </span>
+
+        <span class="legend-ma25">
+          ● 25日線
+        </span>
+      </div>
+
+      <div class="chart-wrap">
+        ${createPriceChart(chartData)}
+      </div>
+
+      <div class="notice">
+        直近最大60営業日の終値と
+        移動平均線を表示しています。
       </div>
     </section>
 
@@ -612,23 +827,44 @@ function createHtml({
 
       <div class="indicator-grid">
         <div class="indicator-item">
-          <div class="detail-label">5日移動平均</div>
+          <div class="detail-label">
+            5日移動平均
+          </div>
+
           <div class="detail-value">
-            ${ma5 !== null ? `${formatNumber(ma5)}円` : "-"}
+            ${
+              ma5 !== null
+                ? `${formatNumber(ma5)}円`
+                : "-"
+            }
           </div>
         </div>
 
         <div class="indicator-item">
-          <div class="detail-label">25日移動平均</div>
+          <div class="detail-label">
+            25日移動平均
+          </div>
+
           <div class="detail-value">
-            ${ma25 !== null ? `${formatNumber(ma25)}円` : "-"}
+            ${
+              ma25 !== null
+                ? `${formatNumber(ma25)}円`
+                : "-"
+            }
           </div>
         </div>
 
         <div class="indicator-item">
-          <div class="detail-label">RSI（14日）</div>
+          <div class="detail-label">
+            RSI（14日）
+          </div>
+
           <div class="detail-value">
-            ${rsi14 !== null ? rsi14.toFixed(1) : "-"}
+            ${
+              rsi14 !== null
+                ? rsi14.toFixed(1)
+                : "-"
+            }
           </div>
         </div>
       </div>
@@ -638,13 +874,21 @@ function createHtml({
       <h2>簡易判定</h2>
 
       <div class="judgment">
-        <div class="judgment-badge ${judgment.className}">
+        <div
+          class="
+            judgment-badge
+            ${judgment.className}
+          "
+        >
           <div class="judgment-label">
-            ${escapeHtml(judgment.label)}
+            ${escapeHtml(
+              judgment.label
+            )}
           </div>
 
           <div class="judgment-score">
-            判定スコア ${judgment.score}点
+            判定スコア
+            ${judgment.score}点
           </div>
         </div>
 
@@ -654,7 +898,8 @@ function createHtml({
       </div>
 
       <div class="notice">
-        この判定は移動平均線とRSIだけを使った簡易評価です。
+        この判定は移動平均線と
+        RSIだけを使った簡易評価です。
         売買を保証するものではありません。
       </div>
     </section>
@@ -682,12 +927,216 @@ function createHtml({
       </div>
 
       <div class="notice">
-        現在のJ-Quants契約で取得可能な日付のデータを表示しています。
+        現在のJ-Quants契約で
+        取得可能な日付のデータを
+        表示しています。
       </div>
     </section>
   </main>
 </body>
 </html>
+  `;
+}
+
+function createPriceChart(data) {
+  if (
+    !Array.isArray(data) ||
+    data.length < 2
+  ) {
+    return `
+      <p>
+        チャートを作成できる
+        データがありません。
+      </p>
+    `;
+  }
+
+  const width = 900;
+  const height = 360;
+
+  const padding = {
+    top: 25,
+    right: 75,
+    bottom: 50,
+    left: 20
+  };
+
+  const allValues = data
+    .flatMap((item) => [
+      item.close,
+      item.ma5,
+      item.ma25
+    ])
+    .filter(
+      (value) =>
+        Number.isFinite(value)
+    );
+
+  const rawMin = Math.min(...allValues);
+  const rawMax = Math.max(...allValues);
+
+  const range =
+    rawMax - rawMin || 1;
+
+  const minValue =
+    rawMin - range * 0.08;
+
+  const maxValue =
+    rawMax + range * 0.08;
+
+  const plotWidth =
+    width -
+    padding.left -
+    padding.right;
+
+  const plotHeight =
+    height -
+    padding.top -
+    padding.bottom;
+
+  const x = (index) =>
+    padding.left +
+    (index / (data.length - 1)) *
+      plotWidth;
+
+  const y = (value) =>
+    padding.top +
+    (
+      (maxValue - value) /
+      (maxValue - minValue)
+    ) *
+      plotHeight;
+
+  const makePoints = (key) =>
+    data
+      .map((item, index) => {
+        if (
+          !Number.isFinite(item[key])
+        ) {
+          return null;
+        }
+
+        return `${x(index).toFixed(1)},${y(
+          item[key]
+        ).toFixed(1)}`;
+      })
+      .filter(Boolean)
+      .join(" ");
+
+  const closePoints =
+    makePoints("close");
+
+  const ma5Points =
+    makePoints("ma5");
+
+  const ma25Points =
+    makePoints("ma25");
+
+  const gridLines = [];
+
+  for (let i = 0; i <= 4; i++) {
+    const gridValue =
+      maxValue -
+      (
+        (maxValue - minValue) / 4
+      ) *
+        i;
+
+    const gridY =
+      y(gridValue);
+
+    gridLines.push(`
+      <line
+        x1="${padding.left}"
+        y1="${gridY}"
+        x2="${width - padding.right}"
+        y2="${gridY}"
+        stroke="#334155"
+        stroke-width="1"
+      />
+
+      <text
+        x="${width - padding.right + 8}"
+        y="${gridY + 5}"
+        fill="#94a3b8"
+        font-size="12"
+      >
+        ${Math.round(
+          gridValue
+        ).toLocaleString("ja-JP")}
+      </text>
+    `);
+  }
+
+  const interval = Math.max(
+    1,
+    Math.floor(data.length / 6)
+  );
+
+  const dateLabels = data
+    .map((item, index) => {
+      if (
+        index % interval !== 0 &&
+        index !== data.length - 1
+      ) {
+        return "";
+      }
+
+      return `
+        <text
+          x="${x(index)}"
+          y="${height - 18}"
+          fill="#94a3b8"
+          font-size="11"
+          text-anchor="middle"
+        >
+          ${escapeHtml(
+            item.date.slice(5)
+          )}
+        </text>
+      `;
+    })
+    .join("");
+
+  return `
+    <svg
+      viewBox="0 0 ${width} ${height}"
+      role="img"
+      aria-label="
+        終値と移動平均線の株価チャート
+      "
+    >
+      ${gridLines.join("")}
+
+      <polyline
+        points="${closePoints}"
+        fill="none"
+        stroke="#e2e8f0"
+        stroke-width="3"
+        stroke-linejoin="round"
+        stroke-linecap="round"
+      />
+
+      <polyline
+        points="${ma5Points}"
+        fill="none"
+        stroke="#38bdf8"
+        stroke-width="2.5"
+        stroke-linejoin="round"
+        stroke-linecap="round"
+      />
+
+      <polyline
+        points="${ma25Points}"
+        fill="none"
+        stroke="#facc15"
+        stroke-width="2.5"
+        stroke-linejoin="round"
+        stroke-linecap="round"
+      />
+
+      ${dateLabels}
+    </svg>
   `;
 }
 
@@ -698,11 +1147,18 @@ function htmlError(message) {
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
+
   <meta
     name="viewport"
-    content="width=device-width, initial-scale=1.0"
+    content="
+      width=device-width,
+      initial-scale=1.0
+    "
   >
-  <title>エラー｜Stock AI</title>
+
+  <title>
+    エラー｜Stock AI
+  </title>
 </head>
 
 <body
@@ -713,10 +1169,19 @@ function htmlError(message) {
     padding:30px;
   "
 >
-  <h1>データ取得エラー</h1>
-  <p>${escapeHtml(message)}</p>
+  <h1>
+    データ取得エラー
+  </h1>
+
   <p>
-    <a href="/" style="color:#60a5fa;">
+    ${escapeHtml(message)}
+  </p>
+
+  <p>
+    <a
+      href="/"
+      style="color:#60a5fa;"
+    >
       トップへ戻る
     </a>
   </p>
@@ -726,8 +1191,10 @@ function htmlError(message) {
     {
       status: 500,
       headers: {
-        "Content-Type": "text/html; charset=UTF-8",
-        "Cache-Control": "no-store"
+        "Content-Type":
+          "text/html; charset=UTF-8",
+        "Cache-Control":
+          "no-store"
       }
     }
   );
@@ -740,7 +1207,8 @@ function formatNumber(value) {
     return "-";
   }
 
-  return Math.round(number).toLocaleString("ja-JP");
+  return Math.round(number)
+    .toLocaleString("ja-JP");
 }
 
 function escapeHtml(value) {
