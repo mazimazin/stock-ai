@@ -6,9 +6,10 @@ export default {
       .trim()
       .toUpperCase();
 
-    const code = inputCode.length === 4
-      ? `${inputCode}0`
-      : inputCode;
+    const code =
+      inputCode.length === 4
+        ? `${inputCode}0`
+        : inputCode;
 
     const stockNames = {
       "285A": "キオクシアホールディングス",
@@ -24,7 +25,8 @@ export default {
     };
 
     const stockName =
-      stockNames[inputCode] || `銘柄コード ${inputCode}`;
+      stockNames[inputCode] ||
+      `銘柄コード ${inputCode}`;
 
     if (!env.JQUANTS_API_KEY) {
       return htmlError(
@@ -65,11 +67,20 @@ export default {
       }
 
       prices.sort(
-        (a, b) => new Date(a.Date) - new Date(b.Date)
+        (a, b) =>
+          new Date(a.Date) - new Date(b.Date)
       );
 
       const closes = prices.map((price) =>
         Number(price.AdjC ?? price.C)
+      );
+
+      const highs = prices.map((price) =>
+        Number(price.AdjH ?? price.H)
+      );
+
+      const lows = prices.map((price) =>
+        Number(price.AdjL ?? price.L)
       );
 
       const volumes = prices.map((price) =>
@@ -77,13 +88,13 @@ export default {
       );
 
       const latest = prices[prices.length - 1];
-
       const previous =
         prices.length >= 2
           ? prices[prices.length - 2]
           : null;
 
-      const latestClose = closes[closes.length - 1];
+      const latestClose =
+        closes[closes.length - 1];
 
       const previousClose = previous
         ? Number(previous.AdjC ?? previous.C)
@@ -102,6 +113,12 @@ export default {
       const ma5 = calculateSMA(closes, 5);
       const ma25 = calculateSMA(closes, 25);
       const rsi14 = calculateRSI(closes, 14);
+      const atr14 = calculateATR(
+        highs,
+        lows,
+        closes,
+        14
+      );
 
       const macdData = calculateMACD(
         closes,
@@ -110,26 +127,34 @@ export default {
         9
       );
 
-      const latestMacd = getLastFinite(
-        macdData.macd
+      const latestMacd =
+        getLastFinite(macdData.macd);
+
+      const latestSignal =
+        getLastFinite(macdData.signal);
+
+      const latestHistogram =
+        getLastFinite(macdData.histogram);
+
+      const recent20High = Math.max(
+        ...highs.slice(-20)
       );
 
-      const latestSignal = getLastFinite(
-        macdData.signal
+      const recent10Low = Math.min(
+        ...lows.slice(-10)
       );
 
-      const latestHistogram = getLastFinite(
-        macdData.histogram
-      );
-
-      const judgment = createJudgment({
+      const strategy = createStrategy({
         latestClose,
         ma5,
         ma25,
         rsi14,
+        atr14,
         latestMacd,
         latestSignal,
-        latestHistogram
+        latestHistogram,
+        recent20High,
+        recent10Low
       });
 
       const recentPrices = prices
@@ -144,13 +169,14 @@ export default {
       const chartData = prices
         .slice(chartStart)
         .map((price, index) => {
-          const absoluteIndex = chartStart + index;
+          const absoluteIndex =
+            chartStart + index;
 
           return {
             date: price.Date,
-            open: Number(price.AdjO ?? price.O),
-            high: Number(price.AdjH ?? price.H),
-            low: Number(price.AdjL ?? price.L),
+            open: Number(
+              price.AdjO ?? price.O
+            ),
             close: closes[absoluteIndex],
             volume: volumes[absoluteIndex],
             ma5: calculateSMAAt(
@@ -163,8 +189,10 @@ export default {
               absoluteIndex,
               25
             ),
-            macd: macdData.macd[absoluteIndex],
-            signal: macdData.signal[absoluteIndex],
+            macd:
+              macdData.macd[absoluteIndex],
+            signal:
+              macdData.signal[absoluteIndex],
             histogram:
               macdData.histogram[absoluteIndex]
           };
@@ -183,10 +211,11 @@ export default {
           ma5,
           ma25,
           rsi14,
+          atr14,
           latestMacd,
           latestSignal,
           latestHistogram,
-          judgment,
+          strategy,
           chartData
         }),
         {
@@ -214,10 +243,12 @@ function calculateSMA(values, period) {
 
   const selected = values.slice(-period);
 
-  return selected.reduce(
-    (sum, value) => sum + value,
-    0
-  ) / period;
+  return (
+    selected.reduce(
+      (sum, value) => sum + value,
+      0
+    ) / period
+  );
 }
 
 function calculateSMAAt(values, index, period) {
@@ -230,10 +261,12 @@ function calculateSMAAt(values, index, period) {
     index + 1
   );
 
-  return selected.reduce(
-    (sum, value) => sum + value,
-    0
-  ) / period;
+  return (
+    selected.reduce(
+      (sum, value) => sum + value,
+      0
+    ) / period
+  );
 }
 
 function calculateRSI(values, period = 14) {
@@ -241,7 +274,9 @@ function calculateRSI(values, period = 14) {
     return null;
   }
 
-  const recent = values.slice(-(period + 1));
+  const recent = values.slice(
+    -(period + 1)
+  );
 
   let gains = 0;
   let losses = 0;
@@ -267,19 +302,68 @@ function calculateRSI(values, period = 14) {
   const relativeStrength =
     averageGain / averageLoss;
 
-  return 100 - 100 / (1 + relativeStrength);
+  return (
+    100 -
+    100 / (1 + relativeStrength)
+  );
+}
+
+function calculateATR(
+  highs,
+  lows,
+  closes,
+  period = 14
+) {
+  if (closes.length <= period) {
+    return null;
+  }
+
+  const trueRanges = [];
+
+  for (let i = 1; i < closes.length; i++) {
+    const highLow = highs[i] - lows[i];
+
+    const highPrevious = Math.abs(
+      highs[i] - closes[i - 1]
+    );
+
+    const lowPrevious = Math.abs(
+      lows[i] - closes[i - 1]
+    );
+
+    trueRanges.push(
+      Math.max(
+        highLow,
+        highPrevious,
+        lowPrevious
+      )
+    );
+  }
+
+  const recentRanges =
+    trueRanges.slice(-period);
+
+  return (
+    recentRanges.reduce(
+      (sum, value) => sum + value,
+      0
+    ) / period
+  );
 }
 
 function calculateEMA(values, period) {
-  const result = new Array(values.length).fill(null);
+  const result =
+    new Array(values.length).fill(null);
 
   if (values.length < period) {
     return result;
   }
 
-  const multiplier = 2 / (period + 1);
+  const multiplier =
+    2 / (period + 1);
 
-  const initialValues = values.slice(0, period);
+  const initialValues =
+    values.slice(0, period);
 
   let previousEma =
     initialValues.reduce(
@@ -289,7 +373,11 @@ function calculateEMA(values, period) {
 
   result[period - 1] = previousEma;
 
-  for (let i = period; i < values.length; i++) {
+  for (
+    let i = period;
+    i < values.length;
+    i++
+  ) {
     const currentEma =
       (values[i] - previousEma) *
         multiplier +
@@ -326,12 +414,14 @@ function calculateMACD(
       return null;
     }
 
-    return shortEma[index] - longEma[index];
+    return (
+      shortEma[index] -
+      longEma[index]
+    );
   });
 
-  const validMacd = macd.filter(
-    Number.isFinite
-  );
+  const validMacd =
+    macd.filter(Number.isFinite);
 
   const validSignal = calculateEMA(
     validMacd,
@@ -343,12 +433,18 @@ function calculateMACD(
 
   let validIndex = 0;
 
-  for (let i = 0; i < macd.length; i++) {
+  for (
+    let i = 0;
+    i < macd.length;
+    i++
+  ) {
     if (!Number.isFinite(macd[i])) {
       continue;
     }
 
-    signal[i] = validSignal[validIndex];
+    signal[i] =
+      validSignal[validIndex];
+
     validIndex++;
   }
 
@@ -373,7 +469,11 @@ function calculateMACD(
 }
 
 function getLastFinite(values) {
-  for (let i = values.length - 1; i >= 0; i--) {
+  for (
+    let i = values.length - 1;
+    i >= 0;
+    i--
+  ) {
     if (Number.isFinite(values[i])) {
       return values[i];
     }
@@ -382,97 +482,99 @@ function getLastFinite(values) {
   return null;
 }
 
-function createJudgment({
+function createStrategy({
   latestClose,
   ma5,
   ma25,
   rsi14,
+  atr14,
   latestMacd,
   latestSignal,
-  latestHistogram
+  latestHistogram,
+  recent20High,
+  recent10Low
 }) {
   let score = 50;
   const reasons = [];
+  const cautions = [];
 
-  if (ma5 !== null) {
-    if (latestClose > ma5) {
-      score += 10;
-      reasons.push(
-        "株価が5日移動平均線を上回っています"
-      );
-    } else {
-      score -= 10;
-      reasons.push(
-        "株価が5日移動平均線を下回っています"
-      );
-    }
+  const bullishTrend =
+    ma5 !== null &&
+    ma25 !== null &&
+    latestClose > ma5 &&
+    ma5 > ma25;
+
+  const overheated =
+    rsi14 !== null && rsi14 >= 70;
+
+  const oversold =
+    rsi14 !== null && rsi14 <= 30;
+
+  const macdBullish =
+    latestMacd !== null &&
+    latestSignal !== null &&
+    latestMacd > latestSignal;
+
+  if (latestClose > ma5) {
+    score += 10;
+    reasons.push(
+      "株価は5日移動平均線を上回っています"
+    );
+  } else {
+    score -= 10;
+    cautions.push(
+      "株価は5日移動平均線を下回っています"
+    );
   }
 
-  if (ma5 !== null && ma25 !== null) {
-    if (ma5 > ma25) {
-      score += 15;
-      reasons.push(
-        "5日線が25日線を上回っています"
-      );
-    } else {
-      score -= 15;
-      reasons.push(
-        "5日線が25日線を下回っています"
-      );
-    }
+  if (ma5 > ma25) {
+    score += 15;
+    reasons.push(
+      "5日線が25日線を上回る上昇トレンドです"
+    );
+  } else {
+    score -= 15;
+    cautions.push(
+      "5日線が25日線を下回っています"
+    );
   }
 
-  if (rsi14 !== null) {
-    if (rsi14 < 30) {
-      score += 15;
-      reasons.push(
-        "RSIが売られすぎ水準です"
-      );
-    } else if (rsi14 > 70) {
-      score -= 15;
-      reasons.push(
-        "RSIが買われすぎ水準です"
-      );
-    } else if (
-      rsi14 >= 45 &&
-      rsi14 <= 65
-    ) {
-      score += 5;
-      reasons.push(
-        "RSIは比較的安定した水準です"
-      );
-    }
+  if (overheated) {
+    score -= 20;
+    cautions.push(
+      `RSIが${rsi14.toFixed(
+        1
+      )}で、短期的に過熱しています`
+    );
+  } else if (oversold) {
+    score += 10;
+    reasons.push(
+      `RSIが${rsi14.toFixed(
+        1
+      )}で、売られすぎ水準です`
+    );
+  }
+
+  if (macdBullish) {
+    score += 10;
+    reasons.push(
+      "MACDがシグナルを上回っています"
+    );
+  } else {
+    score -= 10;
+    cautions.push(
+      "MACDがシグナルを下回っています"
+    );
   }
 
   if (
-    latestMacd !== null &&
-    latestSignal !== null
+    latestHistogram !== null &&
+    latestHistogram > 0
   ) {
-    if (latestMacd > latestSignal) {
-      score += 10;
-      reasons.push(
-        "MACDがシグナルを上回っています"
-      );
-    } else {
-      score -= 10;
-      reasons.push(
-        "MACDがシグナルを下回っています"
-      );
-    }
-  }
-
-  if (latestHistogram !== null) {
-    if (latestHistogram > 0) {
-      score += 5;
-      reasons.push(
-        "MACDヒストグラムはプラスです"
-      );
-    } else {
-      score -= 5;
-      reasons.push(
-        "MACDヒストグラムはマイナスです"
-      );
-    }
+    score += 5;
+    reasons.push(
+      "MACDヒストグラムはプラスです"
+    );
   }
 
   score = Math.max(
@@ -480,29 +582,105 @@ function createJudgment({
     Math.min(100, score)
   );
 
-  if (score >= 70) {
-    return {
-      label: "買い寄り",
-      className: "buy",
-      score,
-      reasons
-    };
+  let label;
+  let className;
+  let action;
+
+  if (bullishTrend && overheated) {
+    label = "上昇トレンド・過熱注意";
+    className = "wait";
+    action =
+      "高値追いより、5日線付近への押し目を待つ場面です。";
+  } else if (
+    bullishTrend &&
+    !overheated &&
+    macdBullish
+  ) {
+    label = "買い候補";
+    className = "buy";
+    action =
+      "上昇トレンドが継続しています。ただし分割で入る方が安全です。";
+  } else if (oversold) {
+    label = "反発待ち";
+    className = "wait";
+    action =
+      "売られすぎですが、反発確認前の買いは慎重に判断します。";
+  } else if (
+    latestClose < ma25
+  ) {
+    label = "下落警戒";
+    className = "danger";
+    action =
+      "25日線を下回っているため、底打ち確認を優先します。";
+  } else {
+    label = "様子見";
+    className = "wait";
+    action =
+      "方向感が十分に揃っていないため、無理に入らない判断です。";
   }
 
-  if (score >= 45) {
-    return {
-      label: "様子見",
-      className: "wait",
-      score,
-      reasons
-    };
-  }
+  const effectiveAtr =
+    Number.isFinite(atr14) && atr14 > 0
+      ? atr14
+      : latestClose * 0.03;
+
+  const pullbackCenter =
+    Number.isFinite(ma5)
+      ? ma5
+      : latestClose - effectiveAtr;
+
+  const entryHigh = Math.min(
+    latestClose,
+    pullbackCenter + effectiveAtr * 0.25
+  );
+
+  const entryLow = Math.max(
+    0,
+    pullbackCenter - effectiveAtr * 0.35
+  );
+
+  const technicalStop = Math.min(
+    recent10Low,
+    Number.isFinite(ma25)
+      ? ma25 - effectiveAtr * 0.3
+      : recent10Low
+  );
+
+  const stopLoss = Math.max(
+    0,
+    technicalStop
+  );
+
+  const entryCenter =
+    (entryLow + entryHigh) / 2;
+
+  const risk = Math.max(
+    effectiveAtr,
+    entryCenter - stopLoss
+  );
+
+  const target1 = Math.max(
+    recent20High,
+    entryCenter + risk * 1.5
+  );
+
+  const target2 = Math.max(
+    target1 + effectiveAtr,
+    entryCenter + risk * 2.5
+  );
 
   return {
-    label: "注意",
-    className: "danger",
     score,
-    reasons
+    label,
+    className,
+    action,
+    reasons,
+    cautions,
+    entryLow,
+    entryHigh,
+    stopLoss,
+    target1,
+    target2
   };
 }
 
@@ -518,20 +696,23 @@ function createHtml({
   ma5,
   ma25,
   rsi14,
+  atr14,
   latestMacd,
   latestSignal,
   latestHistogram,
-  judgment,
+  strategy,
   chartData
 }) {
   const isPositive =
     change !== null && change >= 0;
 
-  const changeClass = isPositive
-    ? "positive"
-    : "negative";
+  const changeClass =
+    isPositive
+      ? "positive"
+      : "negative";
 
-  const changeSign = isPositive ? "+" : "";
+  const changeSign =
+    isPositive ? "+" : "";
 
   const rows = recentPrices
     .map((price) => {
@@ -570,12 +751,21 @@ function createHtml({
     })
     .join("");
 
-  const reasonItems = judgment.reasons
-    .map(
-      (reason) =>
-        `<li>${escapeHtml(reason)}</li>`
-    )
-    .join("");
+  const reasonItems =
+    strategy.reasons
+      .map(
+        (reason) =>
+          `<li>${escapeHtml(reason)}</li>`
+      )
+      .join("");
+
+  const cautionItems =
+    strategy.cautions
+      .map(
+        (reason) =>
+          `<li>${escapeHtml(reason)}</li>`
+      )
+      .join("");
 
   return `
 <!DOCTYPE html>
@@ -588,7 +778,9 @@ function createHtml({
     content="width=device-width, initial-scale=1.0"
   >
 
-  <title>${escapeHtml(stockName)}｜Stock AI</title>
+  <title>
+    ${escapeHtml(stockName)}｜Stock AI
+  </title>
 
   <style>
     * {
@@ -617,9 +809,10 @@ function createHtml({
       font-size: 30px;
     }
 
-    .code {
+    .code,
+    .date,
+    .notice {
       color: #94a3b8;
-      font-size: 15px;
     }
 
     .search {
@@ -644,7 +837,6 @@ function createHtml({
       border-radius: 10px;
       background: #2563eb;
       color: white;
-      font-size: 16px;
       font-weight: bold;
       cursor: pointer;
     }
@@ -655,13 +847,6 @@ function createHtml({
       border: 1px solid #334155;
       border-radius: 16px;
       background: #1e293b;
-      box-shadow:
-        0 12px 30px rgba(0, 0, 0, 0.2);
-    }
-
-    .date {
-      color: #94a3b8;
-      font-size: 14px;
     }
 
     .price {
@@ -684,16 +869,18 @@ function createHtml({
     }
 
     .details,
-    .indicator-grid {
+    .indicator-grid,
+    .strategy-grid {
       display: grid;
       grid-template-columns:
         repeat(auto-fit, minmax(145px, 1fr));
       gap: 12px;
-      margin-top: 24px;
+      margin-top: 22px;
     }
 
     .detail-item,
-    .indicator-item {
+    .indicator-item,
+    .strategy-item {
       padding: 15px;
       border-radius: 10px;
       background: #0f172a;
@@ -729,7 +916,6 @@ function createHtml({
       display: flex;
       flex-wrap: wrap;
       gap: 18px;
-      color: #cbd5e1;
       font-size: 14px;
     }
 
@@ -755,9 +941,9 @@ function createHtml({
 
     .judgment {
       display: grid;
-      grid-template-columns: 180px 1fr;
+      grid-template-columns: 230px 1fr;
       gap: 20px;
-      align-items: center;
+      align-items: start;
     }
 
     .judgment-badge {
@@ -767,13 +953,12 @@ function createHtml({
     }
 
     .judgment-label {
-      font-size: 26px;
+      font-size: 23px;
       font-weight: 800;
     }
 
     .judgment-score {
       margin-top: 8px;
-      font-size: 17px;
     }
 
     .buy {
@@ -794,11 +979,34 @@ function createHtml({
       border: 1px solid #ef4444;
     }
 
-    .reasons {
-      margin: 0;
+    .action {
+      margin-bottom: 15px;
+      padding: 14px;
+      border-left: 4px solid #60a5fa;
+      background: #0f172a;
+      line-height: 1.7;
+    }
+
+    .reasons,
+    .cautions {
       padding-left: 22px;
-      line-height: 1.9;
-      color: #cbd5e1;
+      line-height: 1.8;
+    }
+
+    .cautions {
+      color: #fbbf24;
+    }
+
+    .entry {
+      color: #38bdf8;
+    }
+
+    .stop {
+      color: #f87171;
+    }
+
+    .target {
+      color: #4ade80;
     }
 
     .table-wrap {
@@ -834,7 +1042,6 @@ function createHtml({
 
     .notice {
       margin-top: 18px;
-      color: #94a3b8;
       font-size: 13px;
       line-height: 1.7;
     }
@@ -935,11 +1142,7 @@ function createHtml({
         <div class="detail-item">
           <div class="detail-label">前日終値</div>
           <div class="detail-value">
-            ${
-              previousClose !== null
-                ? `${formatNumber(previousClose)}円`
-                : "-"
-            }
+            ${formatNumber(previousClose)}円
           </div>
         </div>
 
@@ -949,6 +1152,96 @@ function createHtml({
             ${formatNumber(latest.AdjVo ?? latest.Vo)}株
           </div>
         </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>実戦判定</h2>
+
+      <div class="judgment">
+        <div class="judgment-badge ${strategy.className}">
+          <div class="judgment-label">
+            ${escapeHtml(strategy.label)}
+          </div>
+
+          <div class="judgment-score">
+            総合スコア ${strategy.score}点
+          </div>
+        </div>
+
+        <div>
+          <div class="action">
+            ${escapeHtml(strategy.action)}
+          </div>
+
+          <ul class="reasons">
+            ${reasonItems}
+          </ul>
+
+          ${
+            cautionItems
+              ? `
+                <h3>注意点</h3>
+                <ul class="cautions">
+                  ${cautionItems}
+                </ul>
+              `
+              : ""
+          }
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>売買価格の参考目安</h2>
+
+      <div class="strategy-grid">
+        <div class="strategy-item">
+          <div class="detail-label">
+            押し目候補
+          </div>
+
+          <div class="detail-value entry">
+            ${formatNumber(strategy.entryLow)}円
+            ～
+            ${formatNumber(strategy.entryHigh)}円
+          </div>
+        </div>
+
+        <div class="strategy-item">
+          <div class="detail-label">
+            損切り目安
+          </div>
+
+          <div class="detail-value stop">
+            ${formatNumber(strategy.stopLoss)}円
+          </div>
+        </div>
+
+        <div class="strategy-item">
+          <div class="detail-label">
+            利確目安①
+          </div>
+
+          <div class="detail-value target">
+            ${formatNumber(strategy.target1)}円
+          </div>
+        </div>
+
+        <div class="strategy-item">
+          <div class="detail-label">
+            利確目安②
+          </div>
+
+          <div class="detail-value target">
+            ${formatNumber(strategy.target2)}円
+          </div>
+        </div>
+      </div>
+
+      <div class="notice">
+        ATR、移動平均線、直近安値・高値を使った機械的な参考値です。
+        実際の注文価格を保証するものではありません。
       </div>
     </section>
 
@@ -964,10 +1257,6 @@ function createHtml({
       <div class="chart-wrap">
         ${createPriceChart(chartData)}
       </div>
-
-      <div class="notice">
-        直近最大60営業日の終値と移動平均線を表示しています。
-      </div>
     </section>
 
     <section class="card">
@@ -975,10 +1264,6 @@ function createHtml({
 
       <div class="chart-wrap">
         ${createVolumeChart(chartData)}
-      </div>
-
-      <div class="notice">
-        棒が高いほど、その日の売買が活発だったことを表します。
       </div>
     </section>
 
@@ -993,10 +1278,6 @@ function createHtml({
       <div class="chart-wrap">
         ${createMacdChart(chartData)}
       </div>
-
-      <div class="notice">
-        MACDがシグナルを上回ると上向き、下回ると下向きの勢いを示す参考になります。
-      </div>
     </section>
 
     <section class="card">
@@ -1004,44 +1285,30 @@ function createHtml({
 
       <div class="indicator-grid">
         <div class="indicator-item">
-          <div class="detail-label">
-            5日移動平均
-          </div>
-
+          <div class="detail-label">5日移動平均</div>
           <div class="detail-value">
-            ${
-              ma5 !== null
-                ? `${formatNumber(ma5)}円`
-                : "-"
-            }
+            ${formatNumber(ma5)}円
           </div>
         </div>
 
         <div class="indicator-item">
-          <div class="detail-label">
-            25日移動平均
-          </div>
-
+          <div class="detail-label">25日移動平均</div>
           <div class="detail-value">
-            ${
-              ma25 !== null
-                ? `${formatNumber(ma25)}円`
-                : "-"
-            }
+            ${formatNumber(ma25)}円
           </div>
         </div>
 
         <div class="indicator-item">
-          <div class="detail-label">
-            RSI（14日）
-          </div>
-
+          <div class="detail-label">RSI（14日）</div>
           <div class="detail-value">
-            ${
-              rsi14 !== null
-                ? rsi14.toFixed(1)
-                : "-"
-            }
+            ${formatDecimal(rsi14)}
+          </div>
+        </div>
+
+        <div class="indicator-item">
+          <div class="detail-label">ATR（14日）</div>
+          <div class="detail-value">
+            ${formatNumber(atr14)}円
           </div>
         </div>
 
@@ -1053,10 +1320,7 @@ function createHtml({
         </div>
 
         <div class="indicator-item">
-          <div class="detail-label">
-            MACDシグナル
-          </div>
-
+          <div class="detail-label">シグナル</div>
           <div class="detail-value">
             ${formatDecimal(latestSignal)}
           </div>
@@ -1071,31 +1335,6 @@ function createHtml({
             ${formatSignedDecimal(latestHistogram)}
           </div>
         </div>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>簡易判定</h2>
-
-      <div class="judgment">
-        <div class="judgment-badge ${judgment.className}">
-          <div class="judgment-label">
-            ${escapeHtml(judgment.label)}
-          </div>
-
-          <div class="judgment-score">
-            判定スコア ${judgment.score}点
-          </div>
-        </div>
-
-        <ul class="reasons">
-          ${reasonItems}
-        </ul>
-      </div>
-
-      <div class="notice">
-        この判定は移動平均線・RSI・MACDを使った簡易評価です。
-        売買を保証するものではありません。
       </div>
     </section>
 
@@ -1122,7 +1361,8 @@ function createHtml({
       </div>
 
       <div class="notice">
-        現在のJ-Quants契約で取得可能な日付のデータを表示しています。
+        現在のJ-Quants契約で取得可能な日付のデータです。
+        無料プランでは最新市場価格ではない点に注意してください。
       </div>
     </section>
   </main>
@@ -1132,11 +1372,13 @@ function createHtml({
 }
 
 function createPriceChart(data) {
-  const values = data.flatMap((item) => [
-    item.close,
-    item.ma5,
-    item.ma25
-  ]).filter(Number.isFinite);
+  const values = data
+    .flatMap((item) => [
+      item.close,
+      item.ma5,
+      item.ma25
+    ])
+    .filter(Number.isFinite);
 
   if (values.length < 2) {
     return "<p>チャートデータが不足しています。</p>";
@@ -1144,6 +1386,7 @@ function createPriceChart(data) {
 
   const width = 900;
   const height = 360;
+
   const padding = {
     top: 25,
     right: 75,
@@ -1155,206 +1398,11 @@ function createPriceChart(data) {
   const rawMax = Math.max(...values);
   const range = rawMax - rawMin || 1;
 
-  const minValue = rawMin - range * 0.08;
-  const maxValue = rawMax + range * 0.08;
+  const minValue =
+    rawMin - range * 0.08;
 
-  const plotWidth =
-    width - padding.left - padding.right;
-
-  const plotHeight =
-    height - padding.top - padding.bottom;
-
-  const x = (index) =>
-    padding.left +
-    (index / (data.length - 1)) * plotWidth;
-
-  const y = (value) =>
-    padding.top +
-    ((maxValue - value) /
-      (maxValue - minValue)) *
-      plotHeight;
-
-  const makePoints = (key) =>
-    data
-      .map((item, index) => {
-        if (!Number.isFinite(item[key])) {
-          return null;
-        }
-
-        return `${x(index).toFixed(1)},${y(
-          item[key]
-        ).toFixed(1)}`;
-      })
-      .filter(Boolean)
-      .join(" ");
-
-  const gridLines = createGridLines({
-    width,
-    padding,
-    minValue,
-    maxValue,
-    y,
-    formatter: (value) =>
-      Math.round(value).toLocaleString("ja-JP")
-  });
-
-  return `
-    <svg viewBox="0 0 ${width} ${height}">
-      ${gridLines}
-      ${createDateLabels(data, x, height)}
-
-      <polyline
-        points="${makePoints("close")}"
-        fill="none"
-        stroke="#e2e8f0"
-        stroke-width="3"
-        stroke-linejoin="round"
-        stroke-linecap="round"
-      />
-
-      <polyline
-        points="${makePoints("ma5")}"
-        fill="none"
-        stroke="#38bdf8"
-        stroke-width="2.5"
-        stroke-linejoin="round"
-        stroke-linecap="round"
-      />
-
-      <polyline
-        points="${makePoints("ma25")}"
-        fill="none"
-        stroke="#facc15"
-        stroke-width="2.5"
-        stroke-linejoin="round"
-        stroke-linecap="round"
-      />
-    </svg>
-  `;
-}
-
-function createVolumeChart(data) {
-  if (!Array.isArray(data) || data.length === 0) {
-    return "<p>出来高データがありません。</p>";
-  }
-
-  const width = 900;
-  const height = 250;
-
-  const padding = {
-    top: 20,
-    right: 75,
-    bottom: 50,
-    left: 20
-  };
-
-  const maxVolume = Math.max(
-    ...data.map((item) => item.volume)
-  ) || 1;
-
-  const plotWidth =
-    width - padding.left - padding.right;
-
-  const plotHeight =
-    height - padding.top - padding.bottom;
-
-  const step = plotWidth / data.length;
-  const barWidth = Math.max(3, step * 0.65);
-
-  const bars = data.map((item, index) => {
-    const x =
-      padding.left +
-      index * step +
-      (step - barWidth) / 2;
-
-    const barHeight =
-      (item.volume / maxVolume) *
-      plotHeight;
-
-    const y =
-      padding.top +
-      plotHeight -
-      barHeight;
-
-    const isUp = item.close >= item.open;
-
-    const fill = isUp
-      ? "#22c55e"
-      : "#ef4444";
-
-    return `
-      <rect
-        x="${x.toFixed(1)}"
-        y="${y.toFixed(1)}"
-        width="${barWidth.toFixed(1)}"
-        height="${Math.max(1, barHeight).toFixed(1)}"
-        fill="${fill}"
-        opacity="0.8"
-      />
-    `;
-  }).join("");
-
-  const xPosition = (index) =>
-    padding.left +
-    index * step +
-    step / 2;
-
-  return `
-    <svg viewBox="0 0 ${width} ${height}">
-      <line
-        x1="${padding.left}"
-        y1="${padding.top + plotHeight}"
-        x2="${width - padding.right}"
-        y2="${padding.top + plotHeight}"
-        stroke="#334155"
-      />
-
-      <text
-        x="${width - padding.right + 8}"
-        y="${padding.top + 5}"
-        fill="#94a3b8"
-        font-size="12"
-      >
-        ${formatCompactNumber(maxVolume)}
-      </text>
-
-      ${bars}
-      ${createDateLabels(
-        data,
-        xPosition,
-        height
-      )}
-    </svg>
-  `;
-}
-
-function createMacdChart(data) {
-  const values = data.flatMap((item) => [
-    item.macd,
-    item.signal,
-    item.histogram
-  ]).filter(Number.isFinite);
-
-  if (values.length < 2) {
-    return "<p>MACDを計算できるデータが不足しています。</p>";
-  }
-
-  const width = 900;
-  const height = 320;
-
-  const padding = {
-    top: 25,
-    right: 75,
-    bottom: 50,
-    left: 20
-  };
-
-  const rawMin = Math.min(0, ...values);
-  const rawMax = Math.max(0, ...values);
-  const range = rawMax - rawMin || 1;
-
-  const minValue = rawMin - range * 0.1;
-  const maxValue = rawMax + range * 0.1;
+  const maxValue =
+    rawMax + range * 0.08;
 
   const plotWidth =
     width - padding.left - padding.right;
@@ -1387,59 +1435,193 @@ function createMacdChart(data) {
       .filter(Boolean)
       .join(" ");
 
-  const histogramBars = data
+  return `
+    <svg viewBox="0 0 ${width} ${height}">
+      ${createGridLines({
+        width,
+        padding,
+        minValue,
+        maxValue,
+        y,
+        formatter: (value) =>
+          Math.round(value).toLocaleString("ja-JP")
+      })}
+
+      ${createDateLabels(data, x, height)}
+
+      <polyline
+        points="${makePoints("close")}"
+        fill="none"
+        stroke="#e2e8f0"
+        stroke-width="3"
+      />
+
+      <polyline
+        points="${makePoints("ma5")}"
+        fill="none"
+        stroke="#38bdf8"
+        stroke-width="2.5"
+      />
+
+      <polyline
+        points="${makePoints("ma25")}"
+        fill="none"
+        stroke="#facc15"
+        stroke-width="2.5"
+      />
+    </svg>
+  `;
+}
+
+function createVolumeChart(data) {
+  const width = 900;
+  const height = 250;
+
+  const padding = {
+    top: 20,
+    right: 75,
+    bottom: 50,
+    left: 20
+  };
+
+  const maxVolume = Math.max(
+    ...data.map((item) => item.volume)
+  ) || 1;
+
+  const plotWidth =
+    width - padding.left - padding.right;
+
+  const plotHeight =
+    height - padding.top - padding.bottom;
+
+  const step =
+    plotWidth / data.length;
+
+  const barWidth =
+    Math.max(3, step * 0.65);
+
+  const bars = data
     .map((item, index) => {
-      if (!Number.isFinite(item.histogram)) {
-        return "";
-      }
+      const barHeight =
+        (item.volume / maxVolume) *
+        plotHeight;
 
-      const step = plotWidth / data.length;
-      const barWidth = Math.max(3, step * 0.55);
-
-      const barX =
+      const x =
         padding.left +
         index * step +
         (step - barWidth) / 2;
 
-      const zeroY = y(0);
-      const valueY = y(item.histogram);
-
-      const barY = Math.min(zeroY, valueY);
-      const barHeight = Math.abs(
-        zeroY - valueY
-      );
+      const y =
+        padding.top +
+        plotHeight -
+        barHeight;
 
       const fill =
-        item.histogram >= 0
+        item.close >= item.open
           ? "#22c55e"
           : "#ef4444";
 
       return `
         <rect
-          x="${barX.toFixed(1)}"
-          y="${barY.toFixed(1)}"
-          width="${barWidth.toFixed(1)}"
-          height="${Math.max(1, barHeight).toFixed(1)}"
+          x="${x}"
+          y="${y}"
+          width="${barWidth}"
+          height="${Math.max(1, barHeight)}"
           fill="${fill}"
-          opacity="0.5"
+          opacity="0.8"
         />
       `;
     })
     .join("");
 
-  const gridLines = createGridLines({
-    width,
-    padding,
-    minValue,
-    maxValue,
-    y,
-    formatter: (value) =>
-      value.toFixed(0)
-  });
+  const x = (index) =>
+    padding.left +
+    index * step +
+    step / 2;
 
   return `
     <svg viewBox="0 0 ${width} ${height}">
-      ${gridLines}
+      ${bars}
+      ${createDateLabels(data, x, height)}
+    </svg>
+  `;
+}
+
+function createMacdChart(data) {
+  const values = data
+    .flatMap((item) => [
+      item.macd,
+      item.signal,
+      item.histogram
+    ])
+    .filter(Number.isFinite);
+
+  if (values.length < 2) {
+    return "<p>MACDデータが不足しています。</p>";
+  }
+
+  const width = 900;
+  const height = 320;
+
+  const padding = {
+    top: 25,
+    right: 75,
+    bottom: 50,
+    left: 20
+  };
+
+  const rawMin = Math.min(0, ...values);
+  const rawMax = Math.max(0, ...values);
+  const range = rawMax - rawMin || 1;
+
+  const minValue =
+    rawMin - range * 0.1;
+
+  const maxValue =
+    rawMax + range * 0.1;
+
+  const plotWidth =
+    width - padding.left - padding.right;
+
+  const plotHeight =
+    height - padding.top - padding.bottom;
+
+  const x = (index) =>
+    padding.left +
+    (index / (data.length - 1)) *
+      plotWidth;
+
+  const y = (value) =>
+    padding.top +
+    ((maxValue - value) /
+      (maxValue - minValue)) *
+      plotHeight;
+
+  const makePoints = (key) =>
+    data
+      .map((item, index) => {
+        if (!Number.isFinite(item[key])) {
+          return null;
+        }
+
+        return `${x(index).toFixed(1)},${y(
+          item[key]
+        ).toFixed(1)}`;
+      })
+      .filter(Boolean)
+      .join(" ");
+
+  return `
+    <svg viewBox="0 0 ${width} ${height}">
+      ${createGridLines({
+        width,
+        padding,
+        minValue,
+        maxValue,
+        y,
+        formatter: (value) =>
+          value.toFixed(0)
+      })}
 
       <line
         x1="${padding.left}"
@@ -1447,18 +1629,13 @@ function createMacdChart(data) {
         x2="${width - padding.right}"
         y2="${y(0)}"
         stroke="#64748b"
-        stroke-width="1.5"
       />
-
-      ${histogramBars}
 
       <polyline
         points="${makePoints("macd")}"
         fill="none"
         stroke="#60a5fa"
         stroke-width="2.5"
-        stroke-linejoin="round"
-        stroke-linecap="round"
       />
 
       <polyline
@@ -1466,8 +1643,6 @@ function createMacdChart(data) {
         fill="none"
         stroke="#f97316"
         stroke-width="2.5"
-        stroke-linejoin="round"
-        stroke-linecap="round"
       />
 
       ${createDateLabels(data, x, height)}
@@ -1499,7 +1674,6 @@ function createGridLines({
         x2="${width - padding.right}"
         y2="${gridY}"
         stroke="#334155"
-        stroke-width="1"
       />
 
       <text
@@ -1553,10 +1727,6 @@ function htmlError(message) {
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  >
   <title>エラー｜Stock AI</title>
 </head>
 
@@ -1570,12 +1740,6 @@ function htmlError(message) {
 >
   <h1>データ取得エラー</h1>
   <p>${escapeHtml(message)}</p>
-
-  <p>
-    <a href="/" style="color:#60a5fa;">
-      トップへ戻る
-    </a>
-  </p>
 </body>
 </html>
     `,
@@ -1583,8 +1747,7 @@ function htmlError(message) {
       status: 500,
       headers: {
         "Content-Type":
-          "text/html; charset=UTF-8",
-        "Cache-Control": "no-store"
+          "text/html; charset=UTF-8"
       }
     }
   );
@@ -1614,27 +1777,10 @@ function formatSignedDecimal(value) {
     return "-";
   }
 
-  const sign = value >= 0 ? "+" : "";
+  const sign =
+    value >= 0 ? "+" : "";
 
   return `${sign}${value.toFixed(2)}`;
-}
-
-function formatCompactNumber(value) {
-  const number = Number(value);
-
-  if (!Number.isFinite(number)) {
-    return "-";
-  }
-
-  if (number >= 100000000) {
-    return `${(number / 100000000).toFixed(1)}億`;
-  }
-
-  if (number >= 10000) {
-    return `${(number / 10000).toFixed(0)}万`;
-  }
-
-  return number.toLocaleString("ja-JP");
 }
 
 function escapeHtml(value) {
