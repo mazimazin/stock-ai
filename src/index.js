@@ -2506,7 +2506,7 @@ function normalizeNumber(
 
   if (
     !Number.isFinite(number) ||
-    number < 0
+    number <= 0
   ) {
     return fallback;
   }
@@ -2607,3 +2607,4 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
