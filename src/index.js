@@ -1493,6 +1493,123 @@ function createHtml({
       line-height: 1.7;
     }
 
+    .simple-card {
+      padding: 30px;
+      border: 2px solid #334155;
+      background:
+        linear-gradient(
+          145deg,
+          #1e293b,
+          #172033
+        );
+    }
+
+    .simple-top {
+      display: grid;
+      grid-template-columns:
+        minmax(220px, 0.8fr)
+        minmax(320px, 1.2fr);
+      gap: 24px;
+      align-items: stretch;
+    }
+
+    .simple-judgment {
+      display: flex;
+      min-height: 230px;
+      flex-direction: column;
+      justify-content: center;
+      padding: 28px;
+      border-radius: 18px;
+      text-align: center;
+    }
+
+    .simple-small {
+      font-size: 14px;
+      font-weight: 700;
+      opacity: 0.9;
+    }
+
+    .simple-label {
+      margin: 12px 0;
+      font-size: 31px;
+      font-weight: 900;
+      line-height: 1.25;
+    }
+
+    .simple-score {
+      font-size: 23px;
+      font-weight: 800;
+    }
+
+    .simple-main {
+      display: grid;
+      grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .simple-box {
+      display: flex;
+      min-height: 105px;
+      flex-direction: column;
+      justify-content: center;
+      padding: 18px;
+      border-radius: 14px;
+      background: #0f172a;
+    }
+
+    .simple-box-wide {
+      grid-column: 1 / -1;
+    }
+
+    .simple-box-label {
+      color: #94a3b8;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .simple-box-value {
+      margin-top: 7px;
+      font-size: 24px;
+      font-weight: 900;
+      line-height: 1.3;
+    }
+
+    .simple-action {
+      margin-top: 18px;
+      padding: 18px;
+      border-radius: 14px;
+      background: #0f172a;
+      font-size: 17px;
+      font-weight: 700;
+      line-height: 1.7;
+    }
+
+    .simple-price-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 18px;
+      align-items: baseline;
+      margin-bottom: 22px;
+    }
+
+    .simple-current-price {
+      font-size: 34px;
+      font-weight: 900;
+    }
+
+    details.analysis-details {
+      margin-top: 18px;
+      border-top: 1px solid #334155;
+      padding-top: 16px;
+    }
+
+    details.analysis-details summary {
+      color: #cbd5e1;
+      cursor: pointer;
+      font-weight: 800;
+    }
+
     @media (
       max-width: 750px
     ) {
@@ -1514,6 +1631,30 @@ function createHtml({
 
       .judgment {
         grid-template-columns: 1fr;
+      }
+
+      .simple-card {
+        padding: 18px;
+      }
+
+      .simple-top {
+        grid-template-columns: 1fr;
+      }
+
+      .simple-main {
+        grid-template-columns: 1fr;
+      }
+
+      .simple-box-wide {
+        grid-column: auto;
+      }
+
+      .simple-label {
+        font-size: 27px;
+      }
+
+      .simple-box-value {
+        font-size: 21px;
       }
     }
   </style>
@@ -1566,29 +1707,117 @@ function createHtml({
       </button>
     </form>
 
-    <section class="card">
-      <div class="date">
-        最新取得日：
-        ${escapeHtml(latest.Date)}
+    <section class="card simple-card">
+      <div class="simple-price-row">
+        <span class="date">
+          最新取得日：
+          ${escapeHtml(latest.Date)}
+        </span>
+
+        <span class="simple-current-price">
+          ${formatNumber(latestClose)}円
+        </span>
+
+        <span class="change ${changeClass}">
+          ${
+            change !== null
+              ? `${changeSign}${formatNumber(change)}円`
+              : "-"
+          }
+
+          ${
+            changePercent !== null
+              ? `（${changeSign}${changePercent.toFixed(2)}%）`
+              : ""
+          }
+        </span>
       </div>
 
-      <div class="price">
-        ${formatNumber(latestClose)}円
+      <div class="simple-top">
+        <div
+          class="
+            simple-judgment
+            ${strategy.className}
+          "
+        >
+          <div class="simple-small">
+            AI評価
+          </div>
+
+          <div class="simple-label">
+            ${escapeHtml(strategy.label)}
+          </div>
+
+          <div class="simple-score">
+            ${strategy.score}点
+          </div>
+        </div>
+
+        <div class="simple-main">
+          <div class="simple-box simple-box-wide">
+            <div class="simple-box-label">
+              買い候補
+            </div>
+
+            <div class="simple-box-value entry">
+              ${formatNumber(strategy.entryLow)}円
+              ～
+              ${formatNumber(strategy.entryHigh)}円
+            </div>
+          </div>
+
+          <div class="simple-box">
+            <div class="simple-box-label">
+              損切り目安
+            </div>
+
+            <div class="simple-box-value short-stop">
+              ${formatNumber(strategy.shortStop)}円
+            </div>
+          </div>
+
+          <div class="simple-box">
+            <div class="simple-box-label">
+              利確目安
+            </div>
+
+            <div class="simple-box-value target">
+              ${formatNumber(strategy.target1)}円
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="change ${changeClass}">
-        ${
-          change !== null
-            ? `${changeSign}${formatNumber(change)}円`
-            : "-"
-        }
+      <div class="simple-action">
+        ひとこと：
+        ${escapeHtml(strategy.action)}
+      </div>
+
+      <details class="analysis-details">
+        <summary>
+          判断理由と注意点を見る
+        </summary>
+
+        <ul class="reasons">
+          ${reasonItems}
+        </ul>
 
         ${
-          changePercent !== null
-            ? `（${changeSign}${changePercent.toFixed(2)}%）`
+          cautionItems
+            ? `
+              <h3>注意点</h3>
+
+              <ul class="cautions">
+                ${cautionItems}
+              </ul>
+            `
             : ""
         }
-      </div>
+      </details>
+    </section>
+
+    <section class="card">
+      <h2>現在値の詳細</h2>
 
       <div class="details">
         ${detailBox(
@@ -1624,102 +1853,6 @@ function createHtml({
           `${formatNumber(
             latest.AdjVo ?? latest.Vo
           )}株`
-        )}
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>実戦判定</h2>
-
-      <div class="judgment">
-        <div
-          class="
-            judgment-badge
-            ${strategy.className}
-          "
-        >
-          <div class="judgment-label">
-            ${escapeHtml(
-              strategy.label
-            )}
-          </div>
-
-          <div class="judgment-score">
-            総合スコア
-            ${strategy.score}点
-          </div>
-        </div>
-
-        <div>
-          <div class="action">
-            ${escapeHtml(
-              strategy.action
-            )}
-          </div>
-
-          <ul class="reasons">
-            ${reasonItems}
-          </ul>
-
-          ${
-            cautionItems
-              ? `
-                <h3>注意点</h3>
-
-                <ul class="cautions">
-                  ${cautionItems}
-                </ul>
-              `
-              : ""
-          }
-        </div>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>売買価格の参考目安</h2>
-
-      <div class="strategy-grid">
-        ${strategyBox(
-          "押し目候補",
-          `${formatNumber(
-            strategy.entryLow
-          )}円 ～ ${formatNumber(
-            strategy.entryHigh
-          )}円`,
-          "entry"
-        )}
-
-        ${strategyBox(
-          "短期損切り",
-          `${formatNumber(
-            strategy.shortStop
-          )}円`,
-          "short-stop"
-        )}
-
-        ${strategyBox(
-          "スイング損切り",
-          `${formatNumber(
-            strategy.swingStop
-          )}円`,
-          "swing-stop"
-        )}
-
-        ${strategyBox(
-          "利確目安①",
-          `${formatNumber(
-            strategy.target1
-          )}円`,
-          "target"
-        )}
-
-        ${strategyBox(
-          "利確目安②",
-          `${formatNumber(
-            strategy.target2
-          )}円`,
-          "target"
         )}
       </div>
     </section>
