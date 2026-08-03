@@ -196,7 +196,7 @@ export default {
         ...highs.slice(-20)
       );
 
-      const strategy = createStrategyv2({
+      const strategy = createStrategyV2({
         latestClose,
         ma5,
         ma25,
