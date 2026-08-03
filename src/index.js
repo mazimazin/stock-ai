@@ -2753,7 +2753,7 @@ async function analyzeRankingStock(
   const cache = caches.default;
 
   const cacheKey = new Request(
-    `https://stock-ai-cache.local/ranking/${stock.apiCode}`,
+    `,`https://stock-ai-cache.local/ranking-v2/${stock.apiCode}`
     {
       method: "GET"
     }
@@ -2965,9 +2965,13 @@ async function analyzeRankingStock(
     changePercent,
 
     score: strategy.score,
-    label: strategy.label,
-    className: strategy.className,
-    action: strategy.action,
+stars: strategy.stars,
+label: strategy.label,
+className: strategy.className,
+action: strategy.action,
+aiComment: strategy.aiComment,
+strengths: strategy.strengths,
+cautions: strategy.cautions,
 
     entryLow: strategy.entryLow,
     entryHigh: strategy.entryHigh,
