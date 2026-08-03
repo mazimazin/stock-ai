@@ -7,7 +7,10 @@ import {
   formatRatio,
   formatCrossSignal,
   escapeHtml
-} from "./utils.js";
+} from "./utils.js"; 
+import {
+  createStrategy as createStrategyV2
+} from "./strategy.js";
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -2933,7 +2936,7 @@ async function analyzeRankingStock(
     ...highs.slice(-20)
   );
 
-  const strategy = createStrategy({
+  const strategy = createStrategyV2({
     latestClose,
     ma5,
     ma25,
@@ -3146,7 +3149,7 @@ async function analyzeRankingStock(
     ...highs.slice(-20)
   );
 
-  const strategy = createStrategy({
+  const strategy = createStrategyV2({
     latestClose,
     ma5,
     ma25,
