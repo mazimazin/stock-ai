@@ -1,3 +1,13 @@
+import {
+  normalizeNumber,
+  htmlError,
+  formatNumber,
+  formatDecimal,
+  formatSignedDecimal,
+  formatRatio,
+  formatCrossSignal,
+  escapeHtml
+} from "./utils.js";
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -2633,116 +2643,7 @@ function createDateLabels(
     .join("");
 }
 
-function normalizeNumber(
-  value,
-  fallback
-) {
-  const number = Number(value);
 
-  if (
-    !Number.isFinite(number) ||
-    number <= 0
-  ) {
-    return fallback;
-  }
-
-  return number;
-}
-
-function htmlError(message) {
-  return new Response(
-    `
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <title>エラー｜Stock AI</title>
-</head>
-
-<body
-  style="
-    background:#0f172a;
-    color:white;
-    font-family:sans-serif;
-    padding:30px;
-  "
->
-  <h1>データ取得エラー</h1>
-
-  <p>
-    ${escapeHtml(message)}
-  </p>
-</body>
-</html>
-    `,
-    {
-      status: 500,
-      headers: {
-        "Content-Type":
-          "text/html; charset=UTF-8"
-      }
-    }
-  );
-}
-
-function formatNumber(value) {
-  const number = Number(value);
-
-  if (!Number.isFinite(number)) {
-    return "-";
-  }
-
-  return Math.round(number)
-    .toLocaleString("ja-JP");
-}
-
-function formatDecimal(value) {
-  if (!Number.isFinite(value)) {
-    return "-";
-  }
-
-  return value.toFixed(2);
-}
-
-function formatSignedDecimal(value) {
-  if (!Number.isFinite(value)) {
-    return "-";
-  }
-
-  const sign =
-    value >= 0 ? "+" : "";
-
-  return `${sign}${value.toFixed(2)}`;
-}
-
-function formatRatio(value) {
-  if (!Number.isFinite(value)) {
-    return "-";
-  }
-
-  return value.toFixed(2);
-}
-
-function formatCrossSignal(value) {
-  if (value === "golden") {
-    return "ゴールデンクロス発生";
-  }
-
-  if (value === "dead") {
-    return "デッドクロス発生";
-  }
-
-  return "新規クロスなし";
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
 const RANKING_STOCKS = [
   {
     code: "285A",
