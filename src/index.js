@@ -1554,7 +1554,25 @@ function createHtml({
     .simple-score {
       font-size: 23px;
       font-weight: 800;
-    }
+    } 
+    .simple-stars {
+  margin-bottom: 8px;
+  color: #facc15;
+  font-size: 28px;
+  letter-spacing: 3px;
+}
+
+.ai-comment-title {
+  margin-bottom: 7px;
+  color: #60a5fa;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.strength-title {
+  margin-top: 20px;
+  color: #4ade80;
+}
 
     .simple-main {
       display: grid;
@@ -1763,9 +1781,7 @@ function createHtml({
             ${escapeHtml(strategy.label)}
           </div>
 
-          <div class="simple-score">
-            ${strategy.score}点
-          </div>
+         ${strategy.score}点 
         </div>
 
         <div class="simple-main">
@@ -1803,20 +1819,31 @@ function createHtml({
         </div>
       </div>
 
-      <div class="simple-action">
-        ひとこと：
-        ${escapeHtml(strategy.action)}
-      </div>
+     <div class="simple-action">
+  <div class="ai-comment-title">
+    AIコメント
+  </div>
+
+  <div>
+    ${escapeHtml(
+      strategy.aiComment ||
+      strategy.action
+    )}
+  </div>
+</div> 
 
       <details class="analysis-details">
-        <summary>
-          判断理由と注意点を見る
-        </summary>
+       <summary>
+  AI分析の詳細を見る
+</summary>
 
-        <ul class="reasons">
-          ${reasonItems}
-        </ul>
+<h3 class="strength-title">
+  強み
+</h3>
 
+<ul class="reasons">
+  ${reasonItems}
+</ul>
         ${
           cautionItems
             ? `
