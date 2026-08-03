@@ -2743,9 +2743,26 @@ async function createRankingResponse(env) {
 }
 
 async function analyzeRankingStock(
+ async function analyzeRankingStock(
   stock,
   apiKey
 ) {
+  const cache = caches.default;
+
+  const cacheKey = new Request(
+    `https://stock-ai-cache.local/ranking/${stock.apiCode}`,
+    {
+      method: "GET"
+    }
+  );
+
+  const cachedResponse =
+    await cache.match(cacheKey);
+
+  if (cachedResponse) {
+    return await cachedResponse.json();
+  }
+
   const apiUrl = new URL(
     "https://api.jquants.com/v2/equities/bars/daily"
   );
@@ -2762,6 +2779,225 @@ async function analyzeRankingStock(
         "x-api-key": apiKey,
         Accept: "application/json"
       }
+    }
+  );
+
+  let result;
+
+  try {
+    result = await response.json();
+  } catch {
+    throw new Error(
+      `API応答を読み込めませんでした（${response.status}）`
+    );
+  }
+
+  if (!response.ok) {
+    if (response.status === 429) {
+      throw new Error(
+        "API回数制限です。1分ほど空けて再分析してください"
+      );
+    }
+
+    throw new Error(
+      `J-Quants APIエラー：${response.status}`
+    );
+  }
+
+  const prices = Array.isArray(result.data)
+    ? result.data
+    : [];
+
+  if (prices.length === 0) {
+    throw new Error(
+      "株価データがありません"
+    );
+  }
+
+  prices.sort(
+    (a, b) =>
+      new Date(a.Date) -
+      new Date(b.Date)
+  );
+
+  const closes = prices.map((price) =>
+    Number(price.AdjC ?? price.C)
+  );
+
+  const highs = prices.map((price) =>
+    Number(price.AdjH ?? price.H)
+  );
+
+  const lows = prices.map((price) =>
+    Number(price.AdjL ?? price.L)
+  );
+
+  const volumes = prices.map((price) =>
+    Number(price.AdjVo ?? price.Vo)
+  );
+
+  const latest =
+    prices[prices.length - 1];
+
+  const previous =
+    prices.length >= 2
+      ? prices[prices.length - 2]
+      : null;
+
+  const latestClose =
+    closes[closes.length - 1];
+
+  const previousClose = previous
+    ? Number(previous.AdjC ?? previous.C)
+    : null;
+
+  const change =
+    previousClose !== null
+      ? latestClose - previousClose
+      : null;
+
+  const changePercent =
+    previousClose
+      ? (change / previousClose) * 100
+      : null;
+
+  const ma5 =
+    calculateSMA(closes, 5);
+
+  const ma25 =
+    calculateSMA(closes, 25);
+
+  const ma75 =
+    calculateSMA(closes, 75);
+
+  const ma200 =
+    calculateSMA(closes, 200);
+
+  const rsi14 =
+    calculateRSI(closes, 14);
+
+  const bollinger =
+    calculateBollingerBands(
+      closes,
+      20,
+      2
+    );
+
+  const averageVolume20 =
+    calculateSMA(volumes, 20);
+
+  const latestVolume =
+    volumes[volumes.length - 1];
+
+  const volumeRatio =
+    Number.isFinite(averageVolume20) &&
+    averageVolume20 > 0
+      ? latestVolume / averageVolume20
+      : null;
+
+  const crossSignal =
+    detectMovingAverageCross(
+      closes,
+      5,
+      25
+    );
+
+  const atr14 =
+    calculateATR(
+      highs,
+      lows,
+      closes,
+      14
+    );
+
+  const macdData =
+    calculateMACD(
+      closes,
+      12,
+      26,
+      9
+    );
+
+  const latestMacd =
+    getLastFinite(macdData.macd);
+
+  const latestSignal =
+    getLastFinite(macdData.signal);
+
+  const latestHistogram =
+    getLastFinite(
+      macdData.histogram
+    );
+
+  const recent20High = Math.max(
+    ...highs.slice(-20)
+  );
+
+  const strategy = createStrategy({
+    latestClose,
+    ma5,
+    ma25,
+    ma75,
+    ma200,
+    rsi14,
+    bollinger,
+    volumeRatio,
+    crossSignal,
+    atr14,
+    latestMacd,
+    latestSignal,
+    latestHistogram,
+    recent20High,
+    capital: 1000000,
+    riskPercent: 1
+  });
+
+  const analysis = {
+    code: stock.code,
+    name: stock.name,
+    date: latest.Date,
+    latestClose,
+    previousClose,
+    change,
+    changePercent,
+
+    score: strategy.score,
+    label: strategy.label,
+    className: strategy.className,
+    action: strategy.action,
+
+    entryLow: strategy.entryLow,
+    entryHigh: strategy.entryHigh,
+    shortStop: strategy.shortStop,
+    target1: strategy.target1,
+
+    rsi14,
+    volumeRatio,
+    ma5,
+    ma25,
+    latestHistogram
+  };
+
+  const responseToCache = new Response(
+    JSON.stringify(analysis),
+    {
+      headers: {
+        "Content-Type":
+          "application/json; charset=UTF-8",
+
+        "Cache-Control":
+          "public, max-age=21600"
+      }
+    }
+  );
+
+  await cache.put(
+    cacheKey,
+    responseToCache
+  );
+
+  return analysis;
+}
     }
   );
 
