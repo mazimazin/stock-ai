@@ -296,9 +296,10 @@ export default {
           latestSignal,
           latestHistogram,
           strategy,
-          chartData,
-          capital,
-          riskPercent
+supportResistance,
+chartData,
+capital,
+riskPercent
         }),
         {
           headers: {
@@ -719,7 +720,256 @@ function getLastFinite(values) {
 
   return null;
 }
+function detectSupportResistance(
+  highs,
+  lows,
+  closes,
+  {
+    lookback = 120,
+    pivotWindow = 3,
+    tolerancePercent = 1.5,
+    maxLevels = 3
+  } = {}
+) {
+  const latestClose =
+    closes[closes.length - 1];
 
+  if (
+    !Number.isFinite(latestClose) ||
+    closes.length <
+      pivotWindow * 2 + 1
+  ) {
+    return {
+      supports: [],
+      resistances: [],
+      nearestSupport: null,
+      nearestResistance: null,
+      supportDistancePercent: null,
+      resistanceDistancePercent: null
+    };
+  }
+
+  const startIndex = Math.max(
+    pivotWindow,
+    closes.length -
+      lookback
+  );
+
+  const endIndex =
+    closes.length -
+    pivotWindow;
+
+  const pivotLevels = [];
+
+  for (
+    let i = startIndex;
+    i < endIndex;
+    i++
+  ) {
+    const currentLow = lows[i];
+    const currentHigh = highs[i];
+
+    if (
+      !Number.isFinite(currentLow) ||
+      !Number.isFinite(currentHigh)
+    ) {
+      continue;
+    }
+
+    let isPivotLow = true;
+    let isPivotHigh = true;
+
+    for (
+      let offset = 1;
+      offset <= pivotWindow;
+      offset++
+    ) {
+      if (
+        currentLow >
+          lows[i - offset] ||
+        currentLow >
+          lows[i + offset]
+      ) {
+        isPivotLow = false;
+      }
+
+      if (
+        currentHigh <
+          highs[i - offset] ||
+        currentHigh <
+          highs[i + offset]
+      ) {
+        isPivotHigh = false;
+      }
+    }
+
+    if (isPivotLow) {
+      pivotLevels.push({
+        price: currentLow,
+        type: "support",
+        index: i,
+        touches: 1
+      });
+    }
+
+    if (isPivotHigh) {
+      pivotLevels.push({
+        price: currentHigh,
+        type: "resistance",
+        index: i,
+        touches: 1
+      });
+    }
+  }
+
+  const clusteredLevels = [];
+
+  for (const pivot of pivotLevels) {
+    const tolerance =
+      pivot.price *
+      (tolerancePercent / 100);
+
+    const existing =
+      clusteredLevels.find(
+        (level) =>
+          level.type === pivot.type &&
+          Math.abs(
+            level.price -
+              pivot.price
+          ) <= tolerance
+      );
+
+    if (existing) {
+      existing.price =
+        (
+          existing.price *
+            existing.touches +
+          pivot.price
+        ) /
+        (existing.touches + 1);
+
+      existing.touches += 1;
+
+      existing.lastIndex =
+        Math.max(
+          existing.lastIndex,
+          pivot.index
+        );
+    } else {
+      clusteredLevels.push({
+        price: pivot.price,
+        type: pivot.type,
+        touches: 1,
+        lastIndex: pivot.index
+      });
+    }
+  }
+
+  const scoreLevel = (level) => {
+    const recency =
+      level.lastIndex /
+      closes.length;
+
+    return (
+      level.touches * 10 +
+      recency * 5
+    );
+  };
+
+  const supports =
+    clusteredLevels
+      .filter(
+        (level) =>
+          level.type === "support" &&
+          level.price <
+            latestClose
+      )
+      .sort((a, b) => {
+        const priceDifference =
+          b.price - a.price;
+
+        if (
+          Math.abs(priceDifference) >
+          latestClose * 0.005
+        ) {
+          return priceDifference;
+        }
+
+        return (
+          scoreLevel(b) -
+          scoreLevel(a)
+        );
+      })
+      .slice(0, maxLevels);
+
+  const resistances =
+    clusteredLevels
+      .filter(
+        (level) =>
+          level.type ===
+            "resistance" &&
+          level.price >
+            latestClose
+      )
+      .sort((a, b) => {
+        const priceDifference =
+          a.price - b.price;
+
+        if (
+          Math.abs(priceDifference) >
+          latestClose * 0.005
+        ) {
+          return priceDifference;
+        }
+
+        return (
+          scoreLevel(b) -
+          scoreLevel(a)
+        );
+      })
+      .slice(0, maxLevels);
+
+  const nearestSupport =
+    supports.length > 0
+      ? supports[0]
+      : null;
+
+  const nearestResistance =
+    resistances.length > 0
+      ? resistances[0]
+      : null;
+
+  const supportDistancePercent =
+    nearestSupport
+      ? (
+          (
+            nearestSupport.price -
+            latestClose
+          ) /
+          latestClose
+        ) * 100
+      : null;
+
+  const resistanceDistancePercent =
+    nearestResistance
+      ? (
+          (
+            nearestResistance.price -
+            latestClose
+          ) /
+          latestClose
+        ) * 100
+      : null;
+
+  return {
+    supports,
+    resistances,
+    nearestSupport,
+    nearestResistance,
+    supportDistancePercent,
+    resistanceDistancePercent
+  };
+}
 function createStrategy({
   latestClose,
   ma5,
@@ -1116,11 +1366,12 @@ function createHtml({
   atr14,
   latestMacd,
   latestSignal,
-  latestHistogram,
-  strategy,
-  chartData,
-  capital,
-  riskPercent
+ latestHistogram,
+strategy,
+supportResistance,
+chartData,
+capital,
+riskPercent
 }) {
   const isPositive =
     change !== null &&
@@ -1859,6 +2110,113 @@ function createHtml({
     </section>
 
     <section class="card">
+        <section class="card">
+      <h2>価格帯分析</h2>
+
+      <div class="indicator-grid">
+        ${detailBox(
+          "直近サポート",
+          supportResistance
+            .nearestSupport
+            ? `${formatNumber(
+                supportResistance
+                  .nearestSupport
+                  .price
+              )}円`
+            : "-"
+        )}
+
+        ${detailBox(
+          "第2サポート",
+          supportResistance
+            .supports[1]
+            ? `${formatNumber(
+                supportResistance
+                  .supports[1]
+                  .price
+              )}円`
+            : "-"
+        )}
+
+        ${detailBox(
+          "第3サポート",
+          supportResistance
+            .supports[2]
+            ? `${formatNumber(
+                supportResistance
+                  .supports[2]
+                  .price
+              )}円`
+            : "-"
+        )}
+
+        ${detailBox(
+          "直近レジスタンス",
+          supportResistance
+            .nearestResistance
+            ? `${formatNumber(
+                supportResistance
+                  .nearestResistance
+                  .price
+              )}円`
+            : "-"
+        )}
+
+        ${detailBox(
+          "第2レジスタンス",
+          supportResistance
+            .resistances[1]
+            ? `${formatNumber(
+                supportResistance
+                  .resistances[1]
+                  .price
+              )}円`
+            : "-"
+        )}
+
+        ${detailBox(
+          "第3レジスタンス",
+          supportResistance
+            .resistances[2]
+            ? `${formatNumber(
+                supportResistance
+                  .resistances[2]
+                  .price
+              )}円`
+            : "-"
+        )}
+
+        ${detailBox(
+          "サポートまで",
+          Number.isFinite(
+            supportResistance
+              .supportDistancePercent
+          )
+            ? `${supportResistance
+                .supportDistancePercent
+                .toFixed(2)}%`
+            : "-"
+        )}
+
+        ${detailBox(
+          "レジスタンスまで",
+          Number.isFinite(
+            supportResistance
+              .resistanceDistancePercent
+          )
+            ? `+${supportResistance
+                .resistanceDistancePercent
+                .toFixed(2)}%`
+            : "-"
+        )}
+      </div>
+
+      <div class="notice">
+        直近最大120営業日の高値・安値から、
+        複数回意識された価格帯を自動検出しています。
+        将来の反発や反落を保証するものではありません。
+      </div>
+    </section>
       <h2>現在値の詳細</h2>
 
       <div class="details">
@@ -2959,6 +3317,12 @@ async function analyzeRankingStock(
 
   const recent20High = Math.max(
     ...highs.slice(-20)
+  );
+  const supportResistance =
+  detectSupportResistance(
+    highs,
+    lows,
+    closes
   );
 
   const strategy = createStrategyV2({
