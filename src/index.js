@@ -725,11 +725,19 @@ function getLastFinite(values) {
 
   return null;
 }
-function detectSupportResistance(
+  function detectSupportResistance(
   highs,
   lows,
   closes,
-  {
+  options = {}
+) {
+  const {
+    lookback = 60,
+    pivotWindow = 2,
+    tolerancePercent = 1.5,
+    maxDistancePercent = 15,
+    maxLevels = 3
+  } = options;
     lookback = 60,
     pivotWindow = 2,
     tolerancePercent = 1.5,
