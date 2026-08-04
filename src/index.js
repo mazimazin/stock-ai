@@ -195,7 +195,12 @@ export default {
       const recent20High = Math.max(
         ...highs.slice(-20)
       );
-
+const supportResistance =
+  detectSupportResistance(
+    highs,
+    lows,
+    closes
+  );
       const strategy = createStrategyV2({
         latestClose,
         ma5,
