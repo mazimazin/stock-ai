@@ -1,110 +1,28 @@
-export function normalizeNumber(
-  value,
-  fallback
-) {
+export function normalizeNumber(value, fallback) {
   const number = Number(value);
-
-  if (
-    !Number.isFinite(number) ||
-    number <= 0
-  ) {
-    return fallback;
-  }
-
-  return number;
+  return Number.isFinite(number) ? number : fallback;
 }
-
-export function htmlError(message) {
-  return new Response(
-    `
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <title>エラー｜Stock AI</title>
-</head>
-
-<body
-  style="
-    background:#0f172a;
-    color:white;
-    font-family:sans-serif;
-    padding:30px;
-  "
->
-  <h1>データ取得エラー</h1>
-
-  <p>
-    ${escapeHtml(message)}
-  </p>
-</body>
-</html>
-    `,
-    {
-      status: 500,
-      headers: {
-        "Content-Type":
-          "text/html; charset=UTF-8"
-      }
-    }
-  );
+export function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 }
-
 export function formatNumber(value) {
   const number = Number(value);
-
-  if (!Number.isFinite(number)) {
-    return "-";
-  }
-
-  return Math.round(number)
-    .toLocaleString("ja-JP");
+  return Number.isFinite(number) ? Math.round(number).toLocaleString("ja-JP") : "-";
 }
-
 export function formatDecimal(value) {
-  if (!Number.isFinite(value)) {
-    return "-";
-  }
-
-  return value.toFixed(2);
+  return Number.isFinite(value) ? value.toFixed(2) : "-";
 }
-
 export function formatSignedDecimal(value) {
-  if (!Number.isFinite(value)) {
-    return "-";
-  }
-
-  const sign =
-    value >= 0 ? "+" : "";
-
-  return `${sign}${value.toFixed(2)}`;
+  return Number.isFinite(value) ? `${value >= 0 ? "+" : ""}${value.toFixed(2)}` : "-";
 }
-
 export function formatRatio(value) {
-  if (!Number.isFinite(value)) {
-    return "-";
-  }
-
-  return value.toFixed(2);
+  return Number.isFinite(value) ? value.toFixed(2) : "-";
 }
-
 export function formatCrossSignal(value) {
-  if (value === "golden") {
-    return "ゴールデンクロス発生";
-  }
-
-  if (value === "dead") {
-    return "デッドクロス発生";
-  }
-
+  if (value === "golden") return "ゴールデンクロス";
+  if (value === "dead") return "デッドクロス";
   return "新規クロスなし";
 }
-
-export function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+export function htmlError(message, status = 500) {
+  return new Response(`<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><body style="font-family:sans-serif;background:#0f172a;color:#fff;padding:30px"><h1>データ取得エラー</h1><p>${escapeHtml(message)}</p></body></html>`, { status, headers: { "Content-Type": "text/html; charset=UTF-8", "Cache-Control": "no-store" } });
 }
