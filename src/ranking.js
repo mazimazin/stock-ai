@@ -27,7 +27,10 @@ import {
 } from "./strategy.js";
 
 
-export async function createRankingResponse(env) {
+export async function createRankingResponse(
+  env,
+  rankingType = "overall"
+) {
   if (!env.JQUANTS_API_KEY) {
     return htmlError(
       "JQUANTS_API_KEYが設定されていません"
@@ -61,57 +64,6 @@ export async function createRankingResponse(env) {
     }
 
 
-    const successfulResults =
-      results
-        .filter(
-          (item) =>
-            !item.error &&
-            Number.isFinite(
-              item.score
-            )
-        )
-        .sort(
-          (a, b) => {
-
-            // 総合スコアを最優先
-            if (
-              b.score !==
-              a.score
-            ) {
-              return (
-                b.score -
-                a.score
-              );
-            }
-
-            // 同点なら
-            // エントリー評価を優先
-            if (
-              b.entryScore !==
-              a.entryScore
-            ) {
-              return (
-                b.entryScore -
-                a.entryScore
-              );
-            }
-
-            // それでも同じなら
-            // トレンド評価
-            return (
-              b.trendScore -
-              a.trendScore
-            );
-          }
-        )
-        .map(
-          (item, index) => ({
-            ...item,
-            rank: index + 1
-          })
-        );
-
-
     const failedResults =
       results.filter(
         (item) =>
@@ -119,12 +71,35 @@ export async function createRankingResponse(env) {
       );
 
 
+    const validResults =
+      results.filter(
+        (item) =>
+          !item.error &&
+          Number.isFinite(
+            item.score
+          )
+      );
+
+
+    const {
+      rankings,
+      modeTitle,
+      modeDescription
+    } =
+      buildRanking(
+        validResults,
+        rankingType
+      );
+
+
     return new Response(
       createRankingHtml({
-        rankings:
-          successfulResults,
+        rankings,
+        failedResults,
 
-        failedResults
+        rankingType,
+        modeTitle,
+        modeDescription
       }),
       {
         headers: {
@@ -147,6 +122,201 @@ export async function createRankingResponse(env) {
 }
 
 
+// =====================================
+// ランキング方式
+// =====================================
+
+function buildRanking(
+  results,
+  rankingType
+) {
+
+  let rankingItems;
+  let modeTitle;
+  let modeDescription;
+
+
+  // =====================================
+  // 今買うなら
+  // =====================================
+
+  if (
+    rankingType === "entry"
+  ) {
+
+    modeTitle =
+      "今買うならランキング";
+
+
+    modeDescription =
+      "トレンド評価60点以上の銘柄だけを対象に、エントリー評価が高い順で並べています。";
+
+
+    rankingItems =
+      results
+        .filter(
+          (item) =>
+            Number.isFinite(
+              item.trendScore
+            ) &&
+            item.trendScore >= 60
+        )
+        .sort(
+          (a, b) => {
+
+            if (
+              b.entryScore !==
+              a.entryScore
+            ) {
+              return (
+                b.entryScore -
+                a.entryScore
+              );
+            }
+
+            if (
+              b.score !==
+              a.score
+            ) {
+              return (
+                b.score -
+                a.score
+              );
+            }
+
+            return (
+              b.trendScore -
+              a.trendScore
+            );
+          }
+        );
+  }
+
+
+  // =====================================
+  // トレンド最強
+  // =====================================
+
+  else if (
+    rankingType === "trend"
+  ) {
+
+    modeTitle =
+      "トレンド最強ランキング";
+
+
+    modeDescription =
+      "現在のエントリー位置より、銘柄そのもののトレンドの強さを優先して並べています。";
+
+
+    rankingItems =
+      [...results]
+        .sort(
+          (a, b) => {
+
+            if (
+              b.trendScore !==
+              a.trendScore
+            ) {
+              return (
+                b.trendScore -
+                a.trendScore
+              );
+            }
+
+            if (
+              b.score !==
+              a.score
+            ) {
+              return (
+                b.score -
+                a.score
+              );
+            }
+
+            return (
+              b.entryScore -
+              a.entryScore
+            );
+          }
+        );
+  }
+
+
+  // =====================================
+  // 総合
+  // =====================================
+
+  else {
+
+    rankingType =
+      "overall";
+
+
+    modeTitle =
+      "総合ランキング";
+
+
+    modeDescription =
+      "トレンド評価60％、エントリー評価40％で算出した総合スコア順です。";
+
+
+    rankingItems =
+      [...results]
+        .sort(
+          (a, b) => {
+
+            if (
+              b.score !==
+              a.score
+            ) {
+              return (
+                b.score -
+                a.score
+              );
+            }
+
+            if (
+              b.entryScore !==
+              a.entryScore
+            ) {
+              return (
+                b.entryScore -
+                a.entryScore
+              );
+            }
+
+            return (
+              b.trendScore -
+              a.trendScore
+            );
+          }
+        );
+  }
+
+
+  const rankings =
+    rankingItems
+      .map(
+        (item, index) => ({
+          ...item,
+          rank: index + 1
+        })
+      );
+
+
+  return {
+    rankings,
+    modeTitle,
+    modeDescription
+  };
+}
+
+
+// =====================================
+// 銘柄分析
+// =====================================
+
 async function analyzeRankingStock(
   stock,
   apiKey
@@ -156,17 +326,9 @@ async function analyzeRankingStock(
     caches.default;
 
 
-  // =====================================
-  // キャッシュ
-  // =====================================
-  //
-  // strategy.jsを3スコア方式へ変更したため
-  // v6へ更新
-  // =====================================
-
   const cacheKey =
     new Request(
-      `https://stock-ai-cache.local/ranking-v6/${stock.apiCode}`,
+      `https://stock-ai-cache.local/ranking-v7/${stock.apiCode}`,
       {
         method: "GET"
       }
@@ -183,10 +345,6 @@ async function analyzeRankingStock(
     return await cachedResponse.json();
   }
 
-
-  // =====================================
-  // 株価データ取得
-  // =====================================
 
   const prices =
     await fetchDailyBars(
@@ -210,10 +368,6 @@ async function analyzeRankingStock(
       new Date(b.Date)
   );
 
-
-  // =====================================
-  // OHLCV
-  // =====================================
 
   const closes =
     prices.map(
@@ -300,10 +454,6 @@ async function analyzeRankingStock(
       : null;
 
 
-  // =====================================
-  // 移動平均
-  // =====================================
-
   const ma5 =
     calculateSMA(
       closes,
@@ -332,20 +482,12 @@ async function analyzeRankingStock(
     );
 
 
-  // =====================================
-  // RSI
-  // =====================================
-
   const rsi14 =
     calculateRSI(
       closes,
       14
     );
 
-
-  // =====================================
-  // ボリンジャーバンド
-  // =====================================
 
   const bollinger =
     calculateBollingerBands(
@@ -354,10 +496,6 @@ async function analyzeRankingStock(
       2
     );
 
-
-  // =====================================
-  // 出来高
-  // =====================================
 
   const averageVolume20 =
     calculateSMA(
@@ -382,10 +520,6 @@ async function analyzeRankingStock(
       : null;
 
 
-  // =====================================
-  // 移動平均クロス
-  // =====================================
-
   const crossSignal =
     detectMovingAverageCross(
       closes,
@@ -393,10 +527,6 @@ async function analyzeRankingStock(
       25
     );
 
-
-  // =====================================
-  // ATR
-  // =====================================
 
   const atr14 =
     calculateATR(
@@ -406,10 +536,6 @@ async function analyzeRankingStock(
       14
     );
 
-
-  // =====================================
-  // MACD
-  // =====================================
 
   const macdData =
     calculateMACD(
@@ -438,19 +564,11 @@ async function analyzeRankingStock(
     );
 
 
-  // =====================================
-  // 直近20日高値
-  // =====================================
-
   const recent20High =
     Math.max(
       ...highs.slice(-20)
     );
 
-
-  // =====================================
-  // サポート・レジスタンス
-  // =====================================
 
   const supportResistance =
     detectSupportResistance(
@@ -459,10 +577,6 @@ async function analyzeRankingStock(
       closes
     );
 
-
-  // =====================================
-  // 戦略
-  // =====================================
 
   const strategy =
     createStrategy({
@@ -497,10 +611,6 @@ async function analyzeRankingStock(
     });
 
 
-  // =====================================
-  // ランキング用データ
-  // =====================================
-
   const analysis = {
 
     code:
@@ -520,18 +630,17 @@ async function analyzeRankingStock(
     changePercent,
 
 
-    // 総合
     score:
       strategy.score,
 
 
-    // 3スコア
     trendScore:
       Number.isFinite(
         strategy.trendScore
       )
         ? strategy.trendScore
         : strategy.score,
+
 
     entryScore:
       Number.isFinite(
@@ -593,16 +702,13 @@ async function analyzeRankingStock(
         ?.nearestSupport
         ?.price ?? null,
 
+
     resistancePrice:
       supportResistance
         ?.nearestResistance
         ?.price ?? null
   };
 
-
-  // =====================================
-  // 6時間キャッシュ
-  // =====================================
 
   const responseToCache =
     new Response(
@@ -632,12 +738,15 @@ async function analyzeRankingStock(
 
 
 // =====================================
-// ランキングHTML
+// HTML
 // =====================================
 
 function createRankingHtml({
   rankings,
-  failedResults
+  failedResults,
+  rankingType,
+  modeTitle,
+  modeDescription
 }) {
 
   const rankingCards =
@@ -645,7 +754,8 @@ function createRankingHtml({
       .map(
         (item) =>
           createRankingCard(
-            item
+            item,
+            rankingType
           )
       )
       .join("");
@@ -697,7 +807,7 @@ function createRankingHtml({
 
 
   <title>
-    半導体株ランキング｜Stock AI
+    ${escapeHtml(modeTitle)}｜Stock AI
   </title>
 
 
@@ -738,11 +848,55 @@ function createRankingHtml({
 
 
     .sub {
-      margin-bottom: 24px;
+      margin-bottom: 22px;
 
       color: #94a3b8;
 
       line-height: 1.7;
+    }
+
+
+    .ranking-tabs {
+      display: grid;
+
+      grid-template-columns:
+        repeat(
+          3,
+          minmax(0, 1fr)
+        );
+
+      gap: 10px;
+
+      margin-bottom: 26px;
+    }
+
+
+    .ranking-tabs a {
+      display: block;
+
+      padding: 14px 12px;
+
+      border:
+        1px solid #334155;
+
+      border-radius: 12px;
+
+      background: #1e293b;
+      color: #cbd5e1;
+
+      text-align: center;
+      text-decoration: none;
+
+      font-weight: 900;
+    }
+
+
+    .ranking-tabs a.active {
+      border-color: #3b82f6;
+
+      background: #2563eb;
+
+      color: white;
     }
 
 
@@ -757,11 +911,11 @@ function createRankingHtml({
 
 
     .navigation a {
-      padding: 12px 18px;
+      padding: 10px 16px;
 
       border-radius: 10px;
 
-      background: #2563eb;
+      background: #334155;
       color: white;
 
       font-weight: 800;
@@ -881,6 +1035,7 @@ function createRankingHtml({
       gap: 12px;
 
       align-items: center;
+
       justify-content:
         space-between;
     }
@@ -933,16 +1088,12 @@ function createRankingHtml({
     }
 
 
-    /* ============================= */
-    /* トレンド / エントリー評価     */
-    /* ============================= */
-
     .sub-scores {
       display: grid;
 
       grid-template-columns:
         repeat(
-          2,
+          3,
           minmax(0, 1fr)
         );
 
@@ -971,8 +1122,13 @@ function createRankingHtml({
     .sub-score-value {
       margin-top: 4px;
 
-      font-size: 22px;
+      font-size: 21px;
       font-weight: 900;
+    }
+
+
+    .overall-value {
+      color: #4ade80;
     }
 
 
@@ -985,10 +1141,6 @@ function createRankingHtml({
       color: #38bdf8;
     }
 
-
-    /* ============================= */
-    /* 売買価格                      */
-    /* ============================= */
 
     .price-grid {
       display: grid;
@@ -1042,10 +1194,6 @@ function createRankingHtml({
       color: #4ade80;
     }
 
-
-    /* ============================= */
-    /* 指標                          */
-    /* ============================= */
 
     .indicators {
       display: flex;
@@ -1115,6 +1263,21 @@ function createRankingHtml({
     }
 
 
+    .empty {
+      padding: 30px;
+
+      border-radius: 14px;
+
+      background: #1e293b;
+
+      color: #facc15;
+
+      text-align: center;
+
+      line-height: 1.7;
+    }
+
+
     .notice {
       margin-top: 24px;
 
@@ -1146,6 +1309,12 @@ function createRankingHtml({
       }
 
 
+      .ranking-tabs {
+        grid-template-columns:
+          1fr;
+      }
+
+
       .ranking-card {
         grid-template-columns:
           1fr;
@@ -1157,22 +1326,11 @@ function createRankingHtml({
       }
 
 
-      .price-grid {
-        grid-template-columns:
-          1fr;
-      }
-    }
-
-
-    @media (
-      max-width: 500px
-    ) {
-
+      .price-grid,
       .sub-scores {
         grid-template-columns:
           1fr;
       }
-
     }
 
   </style>
@@ -1186,7 +1344,7 @@ function createRankingHtml({
 
 
     <h1>
-      半導体株 AIランキング
+      ${escapeHtml(modeTitle)}
     </h1>
 
 
@@ -1199,22 +1357,54 @@ function createRankingHtml({
 
       <br>
 
-      総合スコアは
-      トレンド評価60％、
-      エントリー評価40％で算出しています。
+      ${escapeHtml(
+        modeDescription
+      )}
 
-      トレンドの強さと、
-      現在位置からの入りやすさを
-      分けて比較できます。
+    </div>
+
+
+    <div class="ranking-tabs">
+
+      <a
+        class="${
+          rankingType === "overall"
+            ? "active"
+            : ""
+        }"
+        href="?mode=ranking&type=overall"
+      >
+        総合ランキング
+      </a>
+
+
+      <a
+        class="${
+          rankingType === "entry"
+            ? "active"
+            : ""
+        }"
+        href="?mode=ranking&type=entry"
+      >
+        今買うなら
+      </a>
+
+
+      <a
+        class="${
+          rankingType === "trend"
+            ? "active"
+            : ""
+        }"
+        href="?mode=ranking&type=trend"
+      >
+        トレンド最強
+      </a>
 
     </div>
 
 
     <nav class="navigation">
-
-      <a href="?mode=ranking">
-        ランキングを再分析
-      </a>
 
       <a href="?code=285A">
         個別分析へ戻る
@@ -1228,8 +1418,16 @@ function createRankingHtml({
       ${
         rankingCards ||
         `
-          <div class="ranking-error">
-            ランキングを作成できませんでした。
+          <div class="empty">
+
+            現在の条件を満たす銘柄はありません。
+
+            ${
+              rankingType === "entry"
+                ? "<br>「今買うなら」はトレンド評価60点以上の銘柄だけを表示します。"
+                : ""
+            }
+
           </div>
         `
       }
@@ -1256,18 +1454,15 @@ function createRankingHtml({
 
     <div class="notice">
 
-      総合順位は、
-      現在実装されているテクニカル指標、
-      サポート・レジスタンス、
-      トレンド評価、
-      エントリー評価を使った
-      ルールベースの比較です。
+      「今買うなら」は、
+      下落トレンド中の銘柄が
+      サポートに近いだけで上位になることを防ぐため、
+      トレンド評価60点未満を除外しています。
 
-      将来の株価上昇を保証するものではありません。
+      各評価は現在実装している
+      ルールベースのテクニカル分析です。
 
-      J-Quantsの日足データは、
-      契約プランに応じた提供範囲と
-      更新時刻のデータを使用します。
+      将来の株価変動を保証するものではありません。
 
     </div>
 
@@ -1285,7 +1480,10 @@ function createRankingHtml({
 // ランキングカード
 // =====================================
 
-function createRankingCard(item) {
+function createRankingCard(
+  item,
+  rankingType
+) {
 
   const isPositive =
     Number.isFinite(
@@ -1349,6 +1547,37 @@ function createRankingCard(item) {
           item.latestHistogram
         )
       : "-";
+
+
+  let mainScore;
+  let mainCaption;
+
+
+  if (
+    rankingType === "entry"
+  ) {
+    mainScore =
+      item.entryScore;
+
+    mainCaption =
+      "エントリー評価";
+
+  } else if (
+    rankingType === "trend"
+  ) {
+    mainScore =
+      item.trendScore;
+
+    mainCaption =
+      "トレンド評価";
+
+  } else {
+    mainScore =
+      item.score;
+
+    mainCaption =
+      "総合スコア";
+  }
 
 
   return `
@@ -1417,11 +1646,13 @@ function createRankingCard(item) {
           <div>
 
             <div class="score">
-              ${item.score}点
+              ${mainScore}点
             </div>
 
             <div class="score-caption">
-              総合スコア
+              ${escapeHtml(
+                mainCaption
+              )}
             </div>
 
           </div>
@@ -1447,7 +1678,25 @@ function createRankingCard(item) {
           <div class="sub-score">
 
             <div class="sub-score-label">
-              トレンド評価
+              総合
+            </div>
+
+            <div
+              class="
+                sub-score-value
+                overall-value
+              "
+            >
+              ${item.score}点
+            </div>
+
+          </div>
+
+
+          <div class="sub-score">
+
+            <div class="sub-score-label">
+              トレンド
             </div>
 
             <div
@@ -1465,7 +1714,7 @@ function createRankingCard(item) {
           <div class="sub-score">
 
             <div class="sub-score-label">
-              エントリー評価
+              エントリー
             </div>
 
             <div
