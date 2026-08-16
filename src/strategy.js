@@ -763,7 +763,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 8. リスク
+  // 8. 1株あたりリスク
   // =====================================
 
   const shortRiskPerShare =
@@ -872,6 +872,11 @@ export function createStrategy({
     100;
 
 
+  const minimumLotTradeValue =
+    entryCenter *
+    100;
+
+
   const safeCapital =
     Number.isFinite(capital) &&
     capital > 0
@@ -910,18 +915,20 @@ export function createStrategy({
       : 0;
 
 
+  // 適正株数が0株なら
+  // 「必要資金0円」という
+  // 誤解を招く表示を作らない
+
   const requiredCapital =
-    recommendedShares *
-    entryCenter;
+    recommendedShares > 0
+      ? recommendedShares *
+        entryCenter
+      : null;
 
 
   // =====================================
   // 13. 100株で取引するための必要条件
   // =====================================
-
-  // 現在設定している許容損失率を守りながら
-  // 100株を現在の損切り幅で持つために
-  // 必要となる総資金
 
   const requiredCapitalFor100 =
     safeRiskPercent > 0
@@ -933,19 +940,12 @@ export function createStrategy({
       : null;
 
 
-  // 現在の資金・許容損失率で
-  // 100株を保有する場合に許容できる
-  // 1株あたり最大損失幅
-
   const maxRiskPerShareFor100 =
     allowedLoss > 0
-      ? allowedLoss / 100
+      ? allowedLoss /
+        100
       : 0;
 
-
-  // 買い候補中心価格から考えた
-  // 「100株でリスクルール内に収めるための」
-  // 理論上の損切り価格
 
   const maxAllowedStopFor100 =
     Math.max(
@@ -955,18 +955,12 @@ export function createStrategy({
     );
 
 
-  // 100株時の損失が
-  // 許容損失の何倍か
-
   const minimumLotRiskMultiple =
     allowedLoss > 0
       ? loss100Short /
         allowedLoss
       : null;
 
-
-  // 100株時の損失が
-  // 投資資金に対して何％か
 
   const minimumLotCapitalRiskPercent =
     safeCapital > 0
@@ -978,9 +972,6 @@ export function createStrategy({
       : null;
 
 
-  // 100株が設定リスク内に
-  // 収まるかどうか
-
   const canTradeMinimumLot =
     allowedLoss > 0 &&
     loss100Short <=
@@ -988,7 +979,30 @@ export function createStrategy({
 
 
   // =====================================
-  // 14. 判定ラベル
+  // 14. 資金面の追加指標
+  // =====================================
+
+  // 現金100%で100株を買う場合、
+  // 現在の入力資金で足りるか
+
+  const canAffordMinimumLot =
+    safeCapital > 0 &&
+    minimumLotTradeValue <=
+    safeCapital;
+
+
+  // 100株の売買代金が
+  // 入力資金の何倍か
+
+  const minimumLotCapitalMultiple =
+    safeCapital > 0
+      ? minimumLotTradeValue /
+        safeCapital
+      : null;
+
+
+  // =====================================
+  // 15. 判定ラベル
   // =====================================
 
   let label;
@@ -1061,7 +1075,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 15. コメント
+  // 16. コメント
   // =====================================
 
   const roundedEntryLow =
@@ -1159,7 +1173,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 16. 理由・注意点
+  // 17. 理由・注意点
   // =====================================
 
   const reasons = [
@@ -1175,7 +1189,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 17. 星評価
+  // 18. 星評価
   // =====================================
 
   const stars =
@@ -1191,7 +1205,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 18. 戻り値
+  // 19. 戻り値
   // =====================================
 
   return {
@@ -1243,9 +1257,14 @@ export function createStrategy({
     allowedLoss,
 
     recommendedShares,
+
     requiredCapital,
 
-    // 新しい100株リスク情報
+    // 100株の売買金額
+
+    minimumLotTradeValue,
+
+    // 100株リスク関連
 
     requiredCapitalFor100,
 
@@ -1257,6 +1276,12 @@ export function createStrategy({
 
     minimumLotCapitalRiskPercent,
 
-    canTradeMinimumLot
+    canTradeMinimumLot,
+
+    // 資金面
+
+    canAffordMinimumLot,
+
+    minimumLotCapitalMultiple
   };
 }
