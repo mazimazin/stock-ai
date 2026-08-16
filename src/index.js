@@ -93,7 +93,7 @@ export default {
 
 
       // =====================================
-      // 基本入力
+      // 入力
       // =====================================
 
       const inputCode =
@@ -156,7 +156,7 @@ export default {
 
 
       // =====================================
-      // J-Quants用コード
+      // J-Quantsコード
       // =====================================
 
       const apiCode =
@@ -173,7 +173,7 @@ export default {
 
 
       // =====================================
-      // 株価取得
+      // データ取得
       // =====================================
 
       const prices =
@@ -272,24 +272,11 @@ export default {
 
 
       const change =
-        Number.isFinite(
-          latestClose
-        ) &&
-        Number.isFinite(
-          previousClose
-        )
-          ? latestClose -
-            previousClose
-          : null;
+        latestClose -
+        previousClose;
 
 
       const changePercent =
-        Number.isFinite(
-          change
-        ) &&
-        Number.isFinite(
-          previousClose
-        ) &&
         previousClose !== 0
           ? (
               change /
@@ -303,55 +290,31 @@ export default {
       // 移動平均
       // =====================================
 
-      const ma5Series =
+      const ma5 =
         calculateSMA(
           closes,
           5
         );
 
 
-      const ma25Series =
+      const ma25 =
         calculateSMA(
           closes,
           25
         );
 
 
-      const ma75Series =
+      const ma75 =
         calculateSMA(
           closes,
           75
         );
 
 
-      const ma200Series =
+      const ma200 =
         calculateSMA(
           closes,
           200
-        );
-
-
-      const ma5 =
-        getLastFinite(
-          ma5Series
-        );
-
-
-      const ma25 =
-        getLastFinite(
-          ma25Series
-        );
-
-
-      const ma75 =
-        getLastFinite(
-          ma75Series
-        );
-
-
-      const ma200 =
-        getLastFinite(
-          ma200Series
         );
 
 
@@ -428,13 +391,14 @@ export default {
 
 
       // =====================================
-      // 移動平均クロス
+      // クロス
       // =====================================
 
       const crossSignal =
         detectMovingAverageCross(
-          ma5Series,
-          ma25Series
+          closes,
+          5,
+          25
         );
 
 
@@ -486,22 +450,16 @@ export default {
       // 20日高値
       // =====================================
 
-      const recent20HighValues =
-        highs
-          .slice(
-            -20
-          )
-          .filter(
-            Number.isFinite
-          );
-
-
       const recent20High =
-        recent20HighValues.length > 0
-          ? Math.max(
-              ...recent20HighValues
+        Math.max(
+          ...highs
+            .slice(
+              -20
             )
-          : null;
+            .filter(
+              Number.isFinite
+            )
+        );
 
 
       // =====================================
@@ -516,7 +474,7 @@ export default {
 
 
       // =====================================
-      // 売買戦略
+      // 戦略
       // =====================================
 
       const strategy =
@@ -558,108 +516,114 @@ export default {
 
 
       // =====================================
-      // チャートデータ
+      // チャート
       // =====================================
 
-      const chartData =
-        prices.map(
-          (
-            price,
-            index
-          ) => {
-
-            const open =
-              Number(
-                price.AdjO ??
-                price.O
-              );
-
-
-            const close =
-              Number(
-                price.AdjC ??
-                price.C
-              );
-
-
-            const volume =
-              Number(
-                price.AdjVo ??
-                price.Vo
-              );
-
-
-            const currentBollinger =
-              calculateBollingerAt(
-                closes,
-                index,
-                20,
-                2
-              );
-
-
-            return {
-
-              date:
-                price.Date,
-
-              open,
-
-              close,
-
-              volume,
-
-              ma5:
-                calculateSMAAt(
-                  closes,
-                  index,
-                  5
-                ),
-
-              ma25:
-                calculateSMAAt(
-                  closes,
-                  index,
-                  25
-                ),
-
-              ma75:
-                calculateSMAAt(
-                  closes,
-                  index,
-                  75
-                ),
-
-              ma200:
-                calculateSMAAt(
-                  closes,
-                  index,
-                  200
-                ),
-
-              bollinger:
-                currentBollinger,
-
-              macd:
-                macdData
-                  .macd?.[
-                    index
-                  ] ?? null,
-
-              signal:
-                macdData
-                  .signal?.[
-                    index
-                  ] ?? null,
-
-              histogram:
-                macdData
-                  .histogram?.[
-                    index
-                  ] ?? null
-            };
-          }
+      const chartStart =
+        Math.max(
+          0,
+          prices.length - 60
         );
+
+
+      const chartData =
+        prices
+          .slice(
+            chartStart
+          )
+          .map(
+            (
+              price,
+              chartIndex
+            ) => {
+
+              const actualIndex =
+                chartStart +
+                chartIndex;
+
+
+              return {
+
+                date:
+                  price.Date,
+
+                open:
+                  Number(
+                    price.AdjO ??
+                    price.O
+                  ),
+
+                close:
+                  Number(
+                    price.AdjC ??
+                    price.C
+                  ),
+
+                volume:
+                  Number(
+                    price.AdjVo ??
+                    price.Vo
+                  ),
+
+                ma5:
+                  calculateSMAAt(
+                    closes,
+                    actualIndex,
+                    5
+                  ),
+
+                ma25:
+                  calculateSMAAt(
+                    closes,
+                    actualIndex,
+                    25
+                  ),
+
+                ma75:
+                  calculateSMAAt(
+                    closes,
+                    actualIndex,
+                    75
+                  ),
+
+                ma200:
+                  calculateSMAAt(
+                    closes,
+                    actualIndex,
+                    200
+                  ),
+
+                bollinger:
+                  calculateBollingerAt(
+                    closes,
+                    actualIndex,
+                    20,
+                    2
+                  ),
+
+                macd:
+                  macdData
+                    .macd?.[
+                      actualIndex
+                    ] ??
+                  null,
+
+                signal:
+                  macdData
+                    .signal?.[
+                      actualIndex
+                    ] ??
+                  null,
+
+                histogram:
+                  macdData
+                    .histogram?.[
+                      actualIndex
+                    ] ??
+                  null
+              };
+            }
+          );
 
 
       // =====================================
@@ -717,9 +681,7 @@ export default {
           atr14,
 
           latestMacd,
-
           latestSignal,
-
           latestHistogram,
 
           strategy,
@@ -742,6 +704,7 @@ export default {
         html,
         {
           headers: {
+
             "content-type":
               "text/html; charset=UTF-8",
 
@@ -769,7 +732,7 @@ export default {
 
 
 // =====================================
-// 指定位置の移動平均
+// 指定位置SMA
 // =====================================
 
 function calculateSMAAt(
@@ -787,16 +750,13 @@ function calculateSMAAt(
   }
 
 
-  const start =
-    index -
-    period +
-    1;
-
-
   const section =
     values.slice(
-      start,
-      index + 1
+      index -
+        period +
+        1,
+      index +
+        1
     );
 
 
@@ -813,25 +773,21 @@ function calculateSMAAt(
   }
 
 
-  const total =
-    section.reduce(
-      (
-        sum,
-        value
-      ) =>
-        sum +
-        value,
-      0
-    );
-
-
-  return total /
-    period;
+  return section.reduce(
+    (
+      sum,
+      value
+    ) =>
+      sum +
+      value,
+    0
+  ) /
+  period;
 }
 
 
 // =====================================
-// 指定位置のボリンジャーバンド
+// 指定位置ボリンジャー
 // =====================================
 
 function calculateBollingerAt(
@@ -854,16 +810,13 @@ function calculateBollingerAt(
   }
 
 
-  const start =
-    index -
-    period +
-    1;
-
-
   const section =
     values.slice(
-      start,
-      index + 1
+      index -
+        period +
+        1,
+      index +
+        1
     );
 
 
