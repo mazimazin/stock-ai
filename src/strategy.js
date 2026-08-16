@@ -80,7 +80,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 2. 基本トレンド判定
+  // 2. 状態判定
   // =====================================
 
   const bullishTrend =
@@ -96,9 +96,19 @@ export function createStrategy({
     ma25 > ma75;
 
 
+  const longBullish =
+    Number.isFinite(ma200) &&
+    latestClose > ma200;
+
+
   const overheated =
     Number.isFinite(rsi14) &&
     rsi14 >= 70;
+
+
+  const veryOverheated =
+    Number.isFinite(rsi14) &&
+    rsi14 >= 80;
 
 
   const oversold =
@@ -109,81 +119,97 @@ export function createStrategy({
   const macdBullish =
     Number.isFinite(latestMacd) &&
     Number.isFinite(latestSignal) &&
-    latestMacd >
-      latestSignal;
+    latestMacd > latestSignal;
+
+
+  const histogramPositive =
+    Number.isFinite(
+      latestHistogram
+    ) &&
+    latestHistogram > 0;
 
 
   // =====================================
-  // 3. AIスコア
+  // 3. トレンド評価
+  // =====================================
+  //
+  // 「銘柄そのものが強いか」
+  // 0～100点
   // =====================================
 
-  let score = 50;
+  let trendScore = 50;
 
-  const reasons = [];
-  const cautions = [];
+  const trendReasons = [];
+  const trendCautions = [];
 
 
-  // 株価 vs 5日線
+  // 株価と5日線
 
   if (
-    Number.isFinite(ma5) &&
-    latestClose > ma5
+    Number.isFinite(ma5)
   ) {
-    score += 10;
+    if (
+      latestClose > ma5
+    ) {
+      trendScore += 10;
 
-    reasons.push(
-      "株価は5日移動平均線を上回っています"
-    );
+      trendReasons.push(
+        "株価は5日移動平均線を上回っています"
+      );
 
-  } else {
-    score -= 10;
+    } else {
+      trendScore -= 10;
 
-    cautions.push(
-      "株価は5日移動平均線を下回っています"
-    );
+      trendCautions.push(
+        "株価は5日移動平均線を下回っています"
+      );
+    }
   }
 
 
-  // 5日線 vs 25日線
+  // 5日線と25日線
 
   if (
     Number.isFinite(ma5) &&
-    Number.isFinite(ma25) &&
-    ma5 > ma25
+    Number.isFinite(ma25)
   ) {
-    score += 15;
+    if (
+      ma5 > ma25
+    ) {
+      trendScore += 15;
 
-    reasons.push(
-      "5日線が25日線を上回る上昇トレンドです"
-    );
+      trendReasons.push(
+        "5日線が25日線を上回る短期上昇トレンドです"
+      );
 
-  } else {
-    score -= 15;
+    } else {
+      trendScore -= 15;
 
-    cautions.push(
-      "5日線が25日線を下回っています"
-    );
+      trendCautions.push(
+        "5日線が25日線を下回っています"
+      );
+    }
   }
 
 
-  // 25日線 vs 75日線
+  // 25日線と75日線
 
   if (
     Number.isFinite(ma25) &&
     Number.isFinite(ma75)
   ) {
     if (mediumBullish) {
-      score += 10;
+      trendScore += 10;
 
-      reasons.push(
+      trendReasons.push(
         "25日線が75日線を上回る中期上昇トレンドです"
       );
 
     } else {
-      score -= 10;
+      trendScore -= 10;
 
-      cautions.push(
-        "25日線が75日線を下回る中期弱気形です"
+      trendCautions.push(
+        "25日線が75日線を下回っています"
       );
     }
   }
@@ -194,50 +220,95 @@ export function createStrategy({
   if (
     Number.isFinite(ma200)
   ) {
-    if (
-      latestClose > ma200
-    ) {
-      score += 5;
+    if (longBullish) {
+      trendScore += 5;
 
-      reasons.push(
-        "株価は200日線を上回り長期基調は良好です"
+      trendReasons.push(
+        "株価は200日線を上回り長期基調も良好です"
       );
 
     } else {
-      score -= 5;
+      trendScore -= 5;
 
-      cautions.push(
+      trendCautions.push(
         "株価は200日線を下回っています"
       );
     }
   }
 
 
-  // MAクロス
+  // ゴールデン / デッドクロス
 
   if (
     crossSignal === "golden"
   ) {
-    score += 10;
+    trendScore += 8;
 
-    reasons.push(
-      "5日線と25日線のゴールデンクロスが発生しました"
+    trendReasons.push(
+      "5日線と25日線のゴールデンクロスが発生しています"
     );
 
   } else if (
     crossSignal === "dead"
   ) {
-    score -= 10;
+    trendScore -= 8;
 
-    cautions.push(
-      "5日線と25日線のデッドクロスが発生しました"
+    trendCautions.push(
+      "5日線と25日線のデッドクロスが発生しています"
     );
   }
 
 
-  // =====================================
-  // 4. 出来高
-  // =====================================
+  // MACD
+
+  if (
+    Number.isFinite(latestMacd) &&
+    Number.isFinite(latestSignal)
+  ) {
+    if (macdBullish) {
+      trendScore += 10;
+
+      trendReasons.push(
+        "MACDがシグナルを上回っています"
+      );
+
+    } else {
+      trendScore -= 10;
+
+      trendCautions.push(
+        "MACDがシグナルを下回っています"
+      );
+    }
+  }
+
+
+  // MACDヒストグラム
+
+  if (
+    Number.isFinite(
+      latestHistogram
+    )
+  ) {
+    if (
+      histogramPositive
+    ) {
+      trendScore += 5;
+
+      trendReasons.push(
+        "MACDヒストグラムはプラスです"
+      );
+
+    } else {
+      trendScore -= 3;
+
+      trendCautions.push(
+        "MACDヒストグラムはマイナスです"
+      );
+    }
+  }
+
+
+  // 出来高
 
   if (
     Number.isFinite(volumeRatio)
@@ -245,36 +316,103 @@ export function createStrategy({
     if (
       volumeRatio >= 2
     ) {
-      score += 10;
+      trendScore += 8;
 
-      reasons.push(
+      trendReasons.push(
         `出来高が20日平均の${volumeRatio.toFixed(1)}倍に急増しています`
       );
 
     } else if (
       volumeRatio >= 1.3
     ) {
-      score += 5;
+      trendScore += 4;
 
-      reasons.push(
+      trendReasons.push(
         `出来高が20日平均の${volumeRatio.toFixed(1)}倍です`
       );
 
     } else if (
       volumeRatio < 0.7
     ) {
-      score -= 5;
+      trendScore -= 5;
 
-      cautions.push(
+      trendCautions.push(
         "出来高が20日平均を大きく下回っています"
       );
     }
   }
 
 
+  trendScore =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        Math.round(trendScore)
+      )
+    );
+
+
   // =====================================
-  // 5. ボリンジャーバンド
+  // 4. エントリー評価
   // =====================================
+  //
+  // 「今この価格から入りやすいか」
+  // 0～100点
+  // =====================================
+
+  let entryScore = 50;
+
+  const entryReasons = [];
+  const entryCautions = [];
+
+
+  // RSI
+
+  if (
+    Number.isFinite(rsi14)
+  ) {
+    if (
+      rsi14 >= 80
+    ) {
+      entryScore -= 30;
+
+      entryCautions.push(
+        `RSIが${rsi14.toFixed(1)}で非常に過熱しています`
+      );
+
+    } else if (
+      rsi14 >= 70
+    ) {
+      entryScore -= 20;
+
+      entryCautions.push(
+        `RSIが${rsi14.toFixed(1)}で短期的に過熱しています`
+      );
+
+    } else if (
+      rsi14 >= 45 &&
+      rsi14 <= 65
+    ) {
+      entryScore += 10;
+
+      entryReasons.push(
+        "RSIは極端な過熱感のない水準です"
+      );
+
+    } else if (
+      rsi14 <= 30
+    ) {
+      entryScore -= 5;
+
+      entryCautions.push(
+        `RSIが${rsi14.toFixed(1)}で売られ過ぎですが、下落継続リスクがあります`
+      );
+    }
+  }
+
+
+  // ボリンジャーバンド
 
   if (
     bollinger &&
@@ -289,123 +427,63 @@ export function createStrategy({
       latestClose >
       bollinger.upper
     ) {
-      score -= 8;
+      entryScore -= 15;
 
-      cautions.push(
-        "株価がボリンジャーバンド+2σを上回り、短期的な行き過ぎに注意が必要です"
+      entryCautions.push(
+        "株価がボリンジャーバンド+2σを上回っており、追い買いには注意が必要です"
       );
 
     } else if (
       latestClose <
       bollinger.lower
     ) {
-      score += 3;
+      entryScore -= 5;
 
-      cautions.push(
-        "株価がボリンジャーバンド-2σを下回っています。反発余地はありますが下落継続にも注意が必要です"
+      entryCautions.push(
+        "株価がボリンジャーバンド-2σを下回っており、反発確認が必要です"
       );
     }
   }
 
 
-  // =====================================
-  // 6. RSI
-  // =====================================
-
-  if (overheated) {
-    score -= 20;
-
-    cautions.push(
-      `RSIが${rsi14.toFixed(1)}で短期的に過熱しています`
-    );
-  }
-
-
-  if (oversold) {
-    score += 3;
-
-    cautions.push(
-      `RSIが${rsi14.toFixed(1)}で売られ過ぎ水準ですが、下落継続には注意が必要です`
-    );
-  }
-
-
-  // =====================================
-  // 7. MACD
-  // =====================================
-
-  if (macdBullish) {
-    score += 10;
-
-    reasons.push(
-      "MACDがシグナルを上回っています"
-    );
-
-  } else {
-    score -= 10;
-
-    cautions.push(
-      "MACDがシグナルを下回っています"
-    );
-  }
-
-
-  if (
-    Number.isFinite(
-      latestHistogram
-    )
-  ) {
-    if (
-      latestHistogram > 0
-    ) {
-      score += 5;
-
-      reasons.push(
-        "MACDヒストグラムはプラスです"
-      );
-
-    } else {
-      cautions.push(
-        "MACDヒストグラムはマイナスです"
-      );
-    }
-  }
-
-
-  // =====================================
-  // 8. サポート評価
-  // =====================================
+  // サポートまでの距離
 
   if (
     supportPrice !== null &&
     supportDistancePercent !== null
   ) {
-
     if (
       supportDistancePercent <= 2
     ) {
-      score += 8;
+      entryScore += 18;
 
-      reasons.push(
+      entryReasons.push(
         `現在値の約${supportDistancePercent.toFixed(1)}%下に直近サポートがあります`
       );
 
     } else if (
-      supportDistancePercent <= 5
+      supportDistancePercent <= 4
     ) {
-      score += 5;
+      entryScore += 12;
 
-      reasons.push(
+      entryReasons.push(
         `現在値の約${supportDistancePercent.toFixed(1)}%下にサポートがあります`
       );
 
     } else if (
-      supportDistancePercent <= 8
+      supportDistancePercent <= 7
     ) {
-      score += 2;
+      entryScore += 6;
 
-      reasons.push(
-        "下値にサポート候補があります"
+      entryReasons.push(
+        "比較的近い位置にサポートがあります"
+      );
+
+    } else {
+      entryScore -= 5;
+
+      entryCautions.push(
+        "直近サポートまで距離があり、下値余地に注意が必要です"
       );
     }
 
@@ -416,84 +494,116 @@ export function createStrategy({
       ) &&
       nearestSupport.touches >= 3
     ) {
-      score += 3;
+      entryScore += 5;
 
-      reasons.push(
-        "直近サポート付近で複数回の価格反応が確認されています"
+      entryReasons.push(
+        "直近サポート付近で複数回の価格反応があります"
       );
     }
   }
 
 
-  // =====================================
-  // 9. レジスタンス評価
-  // =====================================
+  // レジスタンスまでの距離
 
   if (
     resistancePrice !== null &&
     resistanceDistancePercent !== null
   ) {
-
     if (
       resistanceDistancePercent <= 1.5
     ) {
-      score -= 7;
+      entryScore -= 20;
 
-      cautions.push(
-        "現在値のすぐ上にレジスタンスがあり、上値余地が限定される可能性があります"
+      entryCautions.push(
+        "現在値のすぐ上にレジスタンスがあります"
       );
 
     } else if (
       resistanceDistancePercent <= 3
     ) {
-      score -= 3;
+      entryScore -= 10;
 
-      cautions.push(
+      entryCautions.push(
         "現在値の近くに上値抵抗があります"
       );
 
     } else if (
-      resistanceDistancePercent >= 5
+      resistanceDistancePercent <= 5
     ) {
-      score += 2;
+      entryScore -= 3;
 
-      reasons.push(
+      entryCautions.push(
+        "比較的近い位置にレジスタンスがあります"
+      );
+
+    } else {
+      entryScore += 8;
+
+      entryReasons.push(
         "直近レジスタンスまで一定の上値余地があります"
       );
     }
   }
 
 
-  // =====================================
-  // 10. 0～100点に収める
-  // =====================================
+  // トレンドが強い場合は少し加点
 
-  score =
+  if (
+    bullishTrend
+  ) {
+    entryScore += 8;
+
+    entryReasons.push(
+      "短期上昇トレンドが維持されています"
+    );
+  }
+
+
+  // MACDが上向きなら少し加点
+
+  if (
+    macdBullish
+  ) {
+    entryScore += 5;
+  }
+
+
+  entryScore =
     Math.max(
       0,
       Math.min(
         100,
-        Math.round(score)
+        Math.round(entryScore)
       )
     );
 
 
   // =====================================
-  // 11. 買い候補の中心価格
+  // 5. 総合スコア
   // =====================================
   //
-  // サポートが現在値から8%以内なら、
-  // 5日線よりサポートを優先。
-  //
-  // サポートが遠ければ従来どおりMA中心。
+  // トレンド 60%
+  // エントリー 40%
   // =====================================
 
-  let entryAnchor;
+  const score =
+    Math.round(
+      trendScore * 0.6 +
+      entryScore * 0.4
+    );
+
+
+  // =====================================
+  // 6. 買い候補価格
+  // =====================================
 
   const usableSupport =
     supportPrice !== null &&
     supportDistancePercent !== null &&
     supportDistancePercent <= 8;
+
+
+  let entryAnchor;
 
 
   if (usableSupport) {
@@ -513,10 +623,6 @@ export function createStrategy({
   }
 
 
-  // =====================================
-  // 12. 買い候補レンジ
-  // =====================================
-
   let entryLow =
     Math.max(
       0,
@@ -534,7 +640,8 @@ export function createStrategy({
 
 
   if (
-    entryHigh < entryLow
+    entryHigh <
+    entryLow
   ) {
     entryHigh =
       entryLow;
@@ -549,14 +656,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 13. 短期損切り
-  // =====================================
-  //
-  // サポートがある場合：
-  // サポートを明確に割ったところ。
-  //
-  // なければ従来どおり
-  // MA5 + ATR。
+  // 7. 損切り
   // =====================================
 
   let shortStop;
@@ -580,16 +680,12 @@ export function createStrategy({
   }
 
 
-  // =====================================
-  // 14. スイング損切り
-  // =====================================
-
-  let swingStop;
-
-
   const secondSupport =
     supportResistance
       ?.supports?.[1];
+
+
+  let swingStop;
 
 
   if (
@@ -624,8 +720,6 @@ export function createStrategy({
   }
 
 
-  // 損切りがエントリーより上にならないよう保証
-
   shortStop =
     Math.min(
       shortStop,
@@ -641,14 +735,14 @@ export function createStrategy({
 
 
   // =====================================
-  // 15. リスク
+  // 8. リスク
   // =====================================
 
   const shortRiskPerShare =
     Math.max(
       1,
       entryCenter -
-        shortStop
+      shortStop
     );
 
 
@@ -656,19 +750,12 @@ export function createStrategy({
     Math.max(
       1,
       entryCenter -
-        swingStop
+      swingStop
     );
 
 
   // =====================================
-  // 16. 利確①
-  // =====================================
-  //
-  // 直近レジスタンスが
-  // エントリーより上なら最優先。
-  //
-  // なければ20日高値または
-  // RR 1.5倍。
+  // 9. 利確①
   // =====================================
 
   const minimumTarget1 =
@@ -707,7 +794,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 17. 利確②
+  // 10. 利確②
   // =====================================
 
   const target2 =
@@ -722,7 +809,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 18. リスクリワード
+  // 11. リスクリワード
   // =====================================
 
   const riskReward1 =
@@ -742,7 +829,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 19. 資金管理
+  // 12. 資金管理
   // =====================================
 
   const loss100Short =
@@ -758,8 +845,7 @@ export function createStrategy({
   const allowedLoss =
     capital *
     (
-      riskPercent /
-      100
+      riskPercent / 100
     );
 
 
@@ -784,7 +870,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 20. 最終ラベル
+  // 13. 判定ラベル
   // =====================================
 
   let label;
@@ -792,6 +878,16 @@ export function createStrategy({
 
 
   if (
+    bullishTrend &&
+    veryOverheated
+  ) {
+    label =
+      "強い上昇・過熱警戒";
+
+    className =
+      "wait";
+
+  } else if (
     bullishTrend &&
     overheated
   ) {
@@ -802,15 +898,24 @@ export function createStrategy({
       "wait";
 
   } else if (
-    bullishTrend &&
-    macdBullish &&
-    score >= 65
+    trendScore >= 70 &&
+    entryScore >= 70
   ) {
     label =
       "買い候補";
 
     className =
       "buy";
+
+  } else if (
+    trendScore >= 70 &&
+    entryScore < 70
+  ) {
+    label =
+      "強いが待ち";
+
+    className =
+      "wait";
 
   } else if (
     Number.isFinite(ma25) &&
@@ -832,14 +937,16 @@ export function createStrategy({
 
 
   // =====================================
-  // 21. AIコメント
+  // 14. コメント
   // =====================================
 
   const roundedEntryLow =
     Math.round(entryLow);
 
+
   const roundedEntryHigh =
     Math.round(entryHigh);
+
 
   const roundedSupport =
     supportPrice !== null
@@ -847,6 +954,7 @@ export function createStrategy({
           supportPrice
         )
       : null;
+
 
   const roundedResistance =
     resistancePrice !== null
@@ -860,23 +968,28 @@ export function createStrategy({
 
 
   if (
-    bullishTrend &&
-    overheated &&
-    usableSupport
+    trendScore >= 75 &&
+    entryScore < 60
   ) {
     action =
-      `上昇トレンドは維持していますが短期的に過熱しています。` +
-      `現在値を追いかけず、${roundedEntryLow.toLocaleString("ja-JP")}～${roundedEntryHigh.toLocaleString("ja-JP")}円付近への押しを待つ判断です。` +
-      `直近サポートは約${roundedSupport.toLocaleString("ja-JP")}円です。`;
+      `トレンド自体は強い一方、現在位置からのエントリー条件はまだ良くありません。` +
+      `${roundedEntryLow.toLocaleString("ja-JP")}～${roundedEntryHigh.toLocaleString("ja-JP")}円付近までの押し、または反発確認を待つ判断です。`;
+
+  } else if (
+    trendScore >= 70 &&
+    entryScore >= 70
+  ) {
+    action =
+      `トレンドとエントリー条件の両方が比較的良好です。` +
+      `${roundedEntryLow.toLocaleString("ja-JP")}～${roundedEntryHigh.toLocaleString("ja-JP")}円付近を分割エントリー候補とします。`;
 
   } else if (
     bullishTrend &&
-    macdBullish &&
-    usableSupport
+    overheated
   ) {
     action =
-      `上昇基調を維持しています。` +
-      `直近サポート約${roundedSupport.toLocaleString("ja-JP")}円を意識し、${roundedEntryLow.toLocaleString("ja-JP")}～${roundedEntryHigh.toLocaleString("ja-JP")}円を分割エントリー候補とします。`;
+      `上昇トレンドは維持していますが短期的に過熱しています。` +
+      `現在値を追いかけず、${roundedEntryLow.toLocaleString("ja-JP")}～${roundedEntryHigh.toLocaleString("ja-JP")}円付近への押しを待つ判断です。`;
 
   } else if (
     Number.isFinite(ma25) &&
@@ -888,7 +1001,15 @@ export function createStrategy({
   } else {
     action =
       `方向感が十分に揃っていません。` +
-      `買い候補は${roundedEntryLow.toLocaleString("ja-JP")}～${roundedEntryHigh.toLocaleString("ja-JP")}円付近ですが、反発確認を優先します。`;
+      `${roundedEntryLow.toLocaleString("ja-JP")}～${roundedEntryHigh.toLocaleString("ja-JP")}円付近を候補とし、反発確認を優先します。`;
+  }
+
+
+  if (
+    roundedSupport !== null
+  ) {
+    action +=
+      ` 直近サポートは約${roundedSupport.toLocaleString("ja-JP")}円です。`;
   }
 
 
@@ -903,7 +1024,23 @@ export function createStrategy({
 
 
   // =====================================
-  // 22. 星評価
+  // 15. 理由・注意点を統合
+  // =====================================
+
+  const reasons = [
+    ...trendReasons,
+    ...entryReasons
+  ];
+
+
+  const cautions = [
+    ...trendCautions,
+    ...entryCautions
+  ];
+
+
+  // =====================================
+  // 16. 星評価
   // =====================================
 
   const stars =
@@ -919,11 +1056,15 @@ export function createStrategy({
 
 
   // =====================================
-  // 23. 結果
+  // 17. 戻り値
   // =====================================
 
   return {
     score,
+
+    trendScore,
+    entryScore,
+
     stars,
 
     label,
@@ -935,6 +1076,12 @@ export function createStrategy({
     reasons,
     strengths: reasons,
     cautions,
+
+    trendReasons,
+    trendCautions,
+
+    entryReasons,
+    entryCautions,
 
     entryLow,
     entryHigh,
