@@ -1197,7 +1197,6 @@ export function createHtml({
       .simple-box-value {
         font-size: 21px;
       }
-
     }
 
   </style>
@@ -1428,7 +1427,6 @@ export function createHtml({
 
 
           </div>
-
         </div>
 
 
@@ -1464,7 +1462,6 @@ export function createHtml({
               )}円
 
             </div>
-
           </div>
 
 
@@ -1486,7 +1483,6 @@ export function createHtml({
               )}円
 
             </div>
-
           </div>
 
 
@@ -1508,12 +1504,10 @@ export function createHtml({
               )}円
 
             </div>
-
           </div>
 
 
         </div>
-
       </div>
 
 
@@ -1562,6 +1556,7 @@ export function createHtml({
             `
             : ""
         }
+
 
       </details>
 
@@ -1657,7 +1652,7 @@ export function createHtml({
 
 
         ${detailBox(
-                    "サポートまで",
+          "サポートまで",
           Number.isFinite(
             supportResistance
               .supportDistancePercent
@@ -1683,7 +1678,6 @@ export function createHtml({
 
 
       </div>
-
     </section>
 
 
@@ -1742,7 +1736,6 @@ export function createHtml({
 
 
       </div>
-
     </section>
 
 
@@ -1786,7 +1779,6 @@ export function createHtml({
               }
 
             </div>
-
           </div>
 
 
@@ -1889,7 +1881,6 @@ export function createHtml({
               }
 
             </div>
-
           </div>
 
 
@@ -1927,7 +1918,6 @@ export function createHtml({
 
                 資金面で100株を建てられるかどうかと、
                 損失リスクが適正かどうかは別です。
-
                 現在設定している
                 「1回の許容損失
                 ${riskPercent}%」
@@ -1954,7 +1944,6 @@ export function createHtml({
                     )}円
 
                   </div>
-
                 </div>
 
 
@@ -1971,7 +1960,6 @@ export function createHtml({
                     )}円
 
                   </div>
-
                 </div>
 
 
@@ -1994,11 +1982,8 @@ export function createHtml({
                     }
 
                   </div>
-
                 </div>
-
-
-                <div class="risk-warning-box">
+                                <div class="risk-warning-box">
 
                   <div class="risk-warning-label">
                     投資資金に対する損失率
@@ -2017,7 +2002,6 @@ export function createHtml({
                     }
 
                   </div>
-
                 </div>
 
 
@@ -2056,7 +2040,6 @@ export function createHtml({
                       }
 
                     </div>
-
                   </div>
 
 
@@ -2082,7 +2065,6 @@ export function createHtml({
                       }
 
                     </div>
-
                   </div>
 
 
@@ -2108,12 +2090,10 @@ export function createHtml({
                       }
 
                     </div>
-
                   </div>
 
 
                 </div>
-
               </div>
 
 
@@ -2428,7 +2408,6 @@ export function createHtml({
 
 
       </div>
-
     </section>
 
 
@@ -2486,6 +2465,7 @@ function detailBox(
 
   return `
     <div class="detail-item">
+
       <div class="detail-label">
         ${escapeHtml(label)}
       </div>
@@ -2594,6 +2574,7 @@ function createPriceChart(
     1;
 
 
+  // 0円未満にはしない
   const minValue =
     Math.max(
       0,
@@ -2783,10 +2764,7 @@ function createPriceChart(
 
     </svg>
   `;
-}
-
-
-function makeNestedPoints(
+}function makeNestedPoints(
   data,
   x,
   y,
@@ -2972,6 +2950,7 @@ function createVolumeChart(
     >
 
       ${bars}
+
 
       ${createDateLabels(
         data,
@@ -3318,5 +3297,3 @@ function createDateLabels(
     )
     .join("");
 }
-    
-          
