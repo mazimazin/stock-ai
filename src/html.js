@@ -828,8 +828,7 @@ export function createHtml({
       color: #cbd5e1;
 
       cursor: pointer;
-
-      font-weight: 800;
+            font-weight: 800;
     }
 
 
@@ -1376,7 +1375,7 @@ export function createHtml({
         >
 
           <div class="simple-small">
-            AI総合評価
+            今買う点数
           </div>
 
 
@@ -1390,12 +1389,12 @@ export function createHtml({
 
 
           <div class="main-score">
-            ${strategy.score}点
+            ${entryScore}点
           </div>
 
 
           <div class="score-name">
-            総合スコア
+            エントリー評価
           </div>
 
 
@@ -1418,11 +1417,11 @@ export function createHtml({
             <div class="score-breakdown-box">
 
               <div class="score-breakdown-label">
-                エントリー評価
+                AI総合評価
               </div>
 
               <div class="score-breakdown-value">
-                ${entryScore}点
+                ${strategy.score}点
               </div>
 
             </div>
@@ -1658,7 +1657,7 @@ export function createHtml({
 
 
         ${detailBox(
-          "サポートまで",
+                    "サポートまで",
           Number.isFinite(
             supportResistance
               .supportDistancePercent
@@ -2066,7 +2065,7 @@ export function createHtml({
                     <div class="solution-label">
 
                       現在の資金で100株持つ場合の
-                      1株あたり許容損失幅
+                      1株あたり許容損切り幅（100株前提）
 
                     </div>
 
@@ -2091,8 +2090,8 @@ export function createHtml({
 
                     <div class="solution-label">
 
-                      買い候補中心から逆算した
-                      理論上の損切り上限
+                      100株でリスク基準を守る
+                      損切り価格の上限
 
                     </div>
 
@@ -2487,7 +2486,6 @@ function detailBox(
 
   return `
     <div class="detail-item">
-
       <div class="detail-label">
         ${escapeHtml(label)}
       </div>
@@ -2596,7 +2594,6 @@ function createPriceChart(
     1;
 
 
-  // 0円未満にはしない
   const minValue =
     Math.max(
       0,
@@ -3321,3 +3318,5 @@ function createDateLabels(
     )
     .join("");
 }
+    
+          
