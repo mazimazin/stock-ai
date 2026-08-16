@@ -71,7 +71,7 @@ export function createHtml({
 
 
   // =====================================
-  // 最低売買単位100株のリスク判定
+  // 100株リスク管理
   // =====================================
 
   const minimumLotLoss =
@@ -91,29 +91,75 @@ export function createHtml({
 
 
   const minimumLotRiskExceeded =
-    minimumLotLoss !== null &&
-    allowedLoss !== null &&
-    allowedLoss > 0 &&
-    minimumLotLoss > allowedLoss;
+    strategy.canTradeMinimumLot === false ||
+    (
+      minimumLotLoss !== null &&
+      allowedLoss !== null &&
+      allowedLoss > 0 &&
+      minimumLotLoss > allowedLoss
+    );
 
 
   const minimumLotRiskMultiple =
-    minimumLotRiskExceeded
-      ? minimumLotLoss /
-        allowedLoss
-      : null;
+    Number.isFinite(
+      strategy.minimumLotRiskMultiple
+    )
+      ? strategy.minimumLotRiskMultiple
+      : (
+          minimumLotRiskExceeded &&
+          minimumLotLoss !== null &&
+          allowedLoss !== null &&
+          allowedLoss > 0
+            ? minimumLotLoss /
+              allowedLoss
+            : null
+        );
 
 
   const minimumLotCapitalRiskPercent =
-    minimumLotLoss !== null &&
-    Number.isFinite(capital) &&
-    capital > 0
-      ? (
-          minimumLotLoss /
-          capital
-        ) * 100
+    Number.isFinite(
+      strategy.minimumLotCapitalRiskPercent
+    )
+      ? strategy.minimumLotCapitalRiskPercent
+      : (
+          minimumLotLoss !== null &&
+          Number.isFinite(capital) &&
+          capital > 0
+            ? (
+                minimumLotLoss /
+                capital
+              ) * 100
+            : null
+        );
+
+
+  const requiredCapitalFor100 =
+    Number.isFinite(
+      strategy.requiredCapitalFor100
+    )
+      ? strategy.requiredCapitalFor100
       : null;
 
+
+  const maxRiskPerShareFor100 =
+    Number.isFinite(
+      strategy.maxRiskPerShareFor100
+    )
+      ? strategy.maxRiskPerShareFor100
+      : null;
+
+
+  const maxAllowedStopFor100 =
+    Number.isFinite(
+      strategy.maxAllowedStopFor100
+    )
+      ? strategy.maxAllowedStopFor100
+      : null;
+
+
+  // =====================================
+  // 直近10営業日
+  // =====================================
 
   const rows =
     recentPrices
@@ -348,33 +394,8 @@ export function createHtml({
     }
 
 
-    .price {
-      margin: 12px 0 4px;
-
-      font-size: 46px;
-      font-weight: 800;
-    }
-
-
-    .change {
-      font-size: 22px;
-      font-weight: bold;
-    }
-
-
-    .positive {
-      color: #22c55e;
-    }
-
-
-    .negative {
-      color: #ef4444;
-    }
-
-
     .details,
     .indicator-grid,
-    .strategy-grid,
     .risk-grid {
       display: grid;
 
@@ -391,9 +412,7 @@ export function createHtml({
 
 
     .detail-item,
-    .indicator-item,
-    .strategy-item,
-    .risk-item {
+    .strategy-item {
       padding: 15px;
 
       border-radius: 10px;
@@ -533,11 +552,6 @@ export function createHtml({
     }
 
 
-    .swing-stop {
-      color: #f87171;
-    }
-
-
     .target {
       color: #4ade80;
     }
@@ -550,150 +564,6 @@ export function createHtml({
 
     .position {
       color: #c084fc;
-    }
-
-
-    /* ================================= */
-    /* リスク警告                        */
-    /* ================================= */
-
-    .risk-warning {
-      margin-top: 18px;
-      margin-bottom: 20px;
-
-      padding: 20px;
-
-      border:
-        2px solid #ef4444;
-
-      border-radius: 14px;
-
-      background:
-        rgba(239, 68, 68, 0.12);
-    }
-
-
-    .risk-warning-title {
-      color: #f87171;
-
-      font-size: 20px;
-      font-weight: 900;
-    }
-
-
-    .risk-warning-main {
-      margin-top: 12px;
-
-      color: #fca5a5;
-
-      font-size: 16px;
-      font-weight: 700;
-
-      line-height: 1.7;
-    }
-
-
-    .risk-warning-grid {
-      display: grid;
-
-      grid-template-columns:
-        repeat(
-          auto-fit,
-          minmax(170px, 1fr)
-        );
-
-      gap: 10px;
-
-      margin-top: 15px;
-    }
-
-
-    .risk-warning-box {
-      padding: 12px;
-
-      border-radius: 10px;
-
-      background:
-        rgba(15, 23, 42, 0.7);
-    }
-
-
-    .risk-warning-label {
-      color: #94a3b8;
-
-      font-size: 12px;
-    }
-
-
-    .risk-warning-value {
-      margin-top: 4px;
-
-      color: #f87171;
-
-      font-size: 20px;
-      font-weight: 900;
-    }
-
-
-    .risk-warning-note {
-      margin-top: 14px;
-
-      color: #fca5a5;
-
-      font-size: 13px;
-      line-height: 1.7;
-    }
-
-
-    table {
-      width: 100%;
-
-      min-width: 680px;
-
-      border-collapse: collapse;
-    }
-
-
-    .table-wrap {
-      overflow-x: auto;
-    }
-
-
-    th,
-    td {
-      padding: 13px 10px;
-
-      border-bottom:
-        1px solid #334155;
-
-      text-align: right;
-    }
-
-
-    th:first-child,
-    td:first-child {
-      text-align: left;
-    }
-
-
-    th {
-      color: #94a3b8;
-
-      font-size: 13px;
-    }
-
-
-    .close {
-      font-weight: bold;
-    }
-
-
-    .notice {
-      margin-top: 18px;
-
-      font-size: 13px;
-
-      line-height: 1.7;
     }
 
 
@@ -731,6 +601,22 @@ export function createHtml({
     .simple-current-price {
       font-size: 34px;
       font-weight: 900;
+    }
+
+
+    .change {
+      font-size: 22px;
+      font-weight: bold;
+    }
+
+
+    .positive {
+      color: #22c55e;
+    }
+
+
+    .negative {
+      color: #ef4444;
     }
 
 
@@ -924,26 +810,6 @@ export function createHtml({
     }
 
 
-    .strength-title {
-      margin-top: 20px;
-
-      color: #4ade80;
-    }
-
-
-    .reasons,
-    .cautions {
-      padding-left: 22px;
-
-      line-height: 1.8;
-    }
-
-
-    .cautions {
-      color: #fbbf24;
-    }
-
-
     details.analysis-details {
       margin-top: 18px;
 
@@ -963,6 +829,256 @@ export function createHtml({
     }
 
 
+    .strength-title {
+      color: #4ade80;
+    }
+
+
+    .reasons,
+    .cautions {
+      padding-left: 22px;
+
+      line-height: 1.8;
+    }
+
+
+    .cautions {
+      color: #fbbf24;
+    }
+
+
+    /* ================================= */
+    /* リスク警告                        */
+    /* ================================= */
+
+    .risk-warning {
+      margin-top: 18px;
+      margin-bottom: 22px;
+
+      padding: 22px;
+
+      border:
+        2px solid #ef4444;
+
+      border-radius: 16px;
+
+      background:
+        rgba(
+          239,
+          68,
+          68,
+          0.12
+        );
+    }
+
+
+    .risk-warning-title {
+      color: #f87171;
+
+      font-size: 22px;
+      font-weight: 900;
+    }
+
+
+    .risk-warning-main {
+      margin-top: 12px;
+
+      color: #fecaca;
+
+      font-size: 16px;
+      font-weight: 700;
+
+      line-height: 1.7;
+    }
+
+
+    .risk-warning-grid {
+      display: grid;
+
+      grid-template-columns:
+        repeat(
+          auto-fit,
+          minmax(170px, 1fr)
+        );
+
+      gap: 10px;
+
+      margin-top: 18px;
+    }
+
+
+    .risk-warning-box {
+      padding: 13px;
+
+      border-radius: 10px;
+
+      background:
+        rgba(
+          15,
+          23,
+          42,
+          0.78
+        );
+    }
+
+
+    .risk-warning-label {
+      color: #94a3b8;
+
+      font-size: 12px;
+
+      line-height: 1.5;
+    }
+
+
+    .risk-warning-value {
+      margin-top: 5px;
+
+      color: #f87171;
+
+      font-size: 21px;
+      font-weight: 900;
+    }
+
+
+    .solution-box {
+      margin-top: 18px;
+
+      padding: 18px;
+
+      border:
+        1px solid #f59e0b;
+
+      border-radius: 12px;
+
+      background:
+        rgba(
+          245,
+          158,
+          11,
+          0.08
+        );
+    }
+
+
+    .solution-title {
+      color: #fbbf24;
+
+      font-size: 17px;
+      font-weight: 900;
+    }
+
+
+    .solution-grid {
+      display: grid;
+
+      grid-template-columns:
+        repeat(
+          auto-fit,
+          minmax(200px, 1fr)
+        );
+
+      gap: 10px;
+
+      margin-top: 14px;
+    }
+
+
+    .solution-item {
+      padding: 13px;
+
+      border-radius: 10px;
+
+      background: #0f172a;
+    }
+
+
+    .solution-label {
+      color: #94a3b8;
+
+      font-size: 12px;
+    }
+
+
+    .solution-value {
+      margin-top: 5px;
+
+      color: #fbbf24;
+
+      font-size: 21px;
+      font-weight: 900;
+    }
+
+
+    .solution-note {
+      margin-top: 15px;
+
+      color: #cbd5e1;
+
+      font-size: 13px;
+
+      line-height: 1.7;
+    }
+
+
+    .notice {
+      margin-top: 18px;
+
+      color: #94a3b8;
+
+      font-size: 13px;
+
+      line-height: 1.7;
+    }
+
+
+    /* ================================= */
+    /* テーブル                          */
+    /* ================================= */
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+
+    table {
+      width: 100%;
+
+      min-width: 680px;
+
+      border-collapse: collapse;
+    }
+
+
+    th,
+    td {
+      padding: 13px 10px;
+
+      border-bottom:
+        1px solid #334155;
+
+      text-align: right;
+    }
+
+
+    th:first-child,
+    td:first-child {
+      text-align: left;
+    }
+
+
+    th {
+      color: #94a3b8;
+
+      font-size: 13px;
+    }
+
+
+    .close {
+      font-weight: bold;
+    }
+
+
     @media (
       max-width: 750px
     ) {
@@ -974,11 +1090,6 @@ export function createHtml({
 
       .title {
         font-size: 23px;
-      }
-
-
-      .price {
-        font-size: 37px;
       }
 
 
@@ -1010,6 +1121,12 @@ export function createHtml({
       }
 
 
+      .score-breakdown {
+        grid-template-columns:
+          1fr;
+      }
+
+
       .simple-label {
         font-size: 27px;
       }
@@ -1017,12 +1134,6 @@ export function createHtml({
 
       .simple-box-value {
         font-size: 21px;
-      }
-
-
-      .score-breakdown {
-        grid-template-columns:
-          1fr;
       }
 
     }
@@ -1312,14 +1423,10 @@ export function createHtml({
         </div>
 
 
-        <div>
-
-          ${escapeHtml(
-            strategy.aiComment ||
-            strategy.action
-          )}
-
-        </div>
+        ${escapeHtml(
+          strategy.aiComment ||
+          strategy.action
+        )}
 
       </div>
 
@@ -1589,10 +1696,9 @@ export function createHtml({
                 ${riskPercent}%」
                 では、
 
-                日本株の最低売買単位
-                100株を取引した場合の
-                損失想定が
-                許容範囲を超えています。
+                100株を現在の損切り幅で
+                取引すると、
+                設定したリスク上限を超えます。
 
               </div>
 
@@ -1642,10 +1748,15 @@ export function createHtml({
 
                   <div class="risk-warning-value">
 
-                    約${
-                      minimumLotRiskMultiple
-                        .toFixed(1)
-                    }倍
+                    ${
+                      Number.isFinite(
+                        minimumLotRiskMultiple
+                      )
+                        ? `約${minimumLotRiskMultiple.toFixed(
+                            1
+                          )}倍`
+                        : "-"
+                    }
 
                   </div>
 
@@ -1664,10 +1775,11 @@ export function createHtml({
                       Number.isFinite(
                         minimumLotCapitalRiskPercent
                       )
-                        ? minimumLotCapitalRiskPercent
-                            .toFixed(1)
+                        ? `${minimumLotCapitalRiskPercent.toFixed(
+                            1
+                          )}%`
                         : "-"
-                    }%
+                    }
 
                   </div>
 
@@ -1677,17 +1789,115 @@ export function createHtml({
               </div>
 
 
-              <div class="risk-warning-note">
+              <div class="solution-box">
 
-                この条件では、
-                100株単位で取引すると
-                設定したリスク管理基準に
-                収まりません。
+                <div class="solution-title">
+                  100株で取引するなら必要な条件
+                </div>
 
-                損切り位置を近づける、
-                投資資金を増やす、
-                または取引を見送るなどの
-                判断が必要です。
+
+                <div class="solution-grid">
+
+
+                  <div class="solution-item">
+
+                    <div class="solution-label">
+
+                      ${riskPercent}%ルールを守るために
+                      必要な総資金
+
+                    </div>
+
+                    <div class="solution-value">
+
+                      ${
+                        Number.isFinite(
+                          requiredCapitalFor100
+                        )
+                          ? `${formatNumber(
+                              requiredCapitalFor100
+                            )}円`
+                          : "-"
+                      }
+
+                    </div>
+
+                  </div>
+
+
+                  <div class="solution-item">
+
+                    <div class="solution-label">
+
+                      現在の資金で
+                      100株持つ場合の
+                      1株あたり許容損失幅
+
+                    </div>
+
+                    <div class="solution-value">
+
+                      ${
+                        Number.isFinite(
+                          maxRiskPerShareFor100
+                        )
+                          ? `${formatNumber(
+                              maxRiskPerShareFor100
+                            )}円`
+                          : "-"
+                      }
+
+                    </div>
+
+                  </div>
+
+
+                  <div class="solution-item">
+
+                    <div class="solution-label">
+
+                      買い候補中心から計算した
+                      理論上の損切り上限
+
+                    </div>
+
+                    <div class="solution-value">
+
+                      ${
+                        Number.isFinite(
+                          maxAllowedStopFor100
+                        )
+                          ? `${formatNumber(
+                              maxAllowedStopFor100
+                            )}円`
+                          : "-"
+                      }
+
+                    </div>
+
+                  </div>
+
+
+                </div>
+
+
+                <div class="solution-note">
+
+                  「理論上の損切り上限」は、
+                  資金管理だけから逆算した価格です。
+
+                  実際のチャート上のサポートや
+                  ATRを無視して損切りを近づけると、
+                  通常の値動きだけで
+                  損切りされる可能性があります。
+
+                  そのため、
+                  チャート上の合理的な損切り位置と
+                  資金管理が両立しない場合は、
+                  無理に100株を取引しない判断を
+                  優先します。
+
+                </div>
 
               </div>
 
@@ -2035,7 +2245,7 @@ export function createHtml({
 
 
     <!-- ================================= -->
-    <!-- 最近10営業日                      -->
+    <!-- 直近10営業日                      -->
     <!-- ================================= -->
 
     <section class="card">
@@ -2053,29 +2263,12 @@ export function createHtml({
 
             <tr>
 
-              <th>
-                日付
-              </th>
-
-              <th>
-                始値
-              </th>
-
-              <th>
-                高値
-              </th>
-
-              <th>
-                安値
-              </th>
-
-              <th>
-                終値
-              </th>
-
-              <th>
-                出来高
-              </th>
+              <th>日付</th>
+              <th>始値</th>
+              <th>高値</th>
+              <th>安値</th>
+              <th>終値</th>
+              <th>出来高</th>
 
             </tr>
 
@@ -2212,6 +2405,7 @@ function createPriceChart(
   if (
     values.length < 2
   ) {
+
     return `
       <p>
         チャートデータが不足しています。
@@ -2319,6 +2513,7 @@ function createPriceChart(
                 item[key]
               )
             ) {
+
               return null;
             }
 
@@ -2368,11 +2563,9 @@ function createPriceChart(
 
 
       <polyline
-        points="${
-          makePoints(
-            "close"
-          )
-        }"
+        points="${makePoints(
+          "close"
+        )}"
         fill="none"
         stroke="#e2e8f0"
         stroke-width="3"
@@ -2380,11 +2573,9 @@ function createPriceChart(
 
 
       <polyline
-        points="${
-          makePoints(
-            "ma5"
-          )
-        }"
+        points="${makePoints(
+          "ma5"
+        )}"
         fill="none"
         stroke="#38bdf8"
         stroke-width="2.5"
@@ -2392,11 +2583,9 @@ function createPriceChart(
 
 
       <polyline
-        points="${
-          makePoints(
-            "ma25"
-          )
-        }"
+        points="${makePoints(
+          "ma25"
+        )}"
         fill="none"
         stroke="#facc15"
         stroke-width="2.5"
@@ -2404,11 +2593,9 @@ function createPriceChart(
 
 
       <polyline
-        points="${
-          makePoints(
-            "ma75"
-          )
-        }"
+        points="${makePoints(
+          "ma75"
+        )}"
         fill="none"
         stroke="#a855f7"
         stroke-width="2.2"
@@ -2416,11 +2603,9 @@ function createPriceChart(
 
 
       <polyline
-        points="${
-          makePoints(
-            "ma200"
-          )
-        }"
+        points="${makePoints(
+          "ma200"
+        )}"
         fill="none"
         stroke="#fb7185"
         stroke-width="2.2"
@@ -2493,6 +2678,7 @@ function makeNestedPoints(
             value
           )
         ) {
+
           return null;
         }
 
@@ -2696,6 +2882,7 @@ function createMacdChart(
   if (
     values.length < 2
   ) {
+
     return `
       <p>
         MACDデータが不足しています。
@@ -2805,6 +2992,7 @@ function createMacdChart(
                 item[key]
               )
             ) {
+
               return null;
             }
 
@@ -2838,7 +3026,9 @@ function createMacdChart(
 
         formatter:
           (value) =>
-            value.toFixed(0)
+            value.toFixed(
+              0
+            )
       })}
 
 
@@ -2855,11 +3045,9 @@ function createMacdChart(
 
 
       <polyline
-        points="${
-          makePoints(
-            "macd"
-          )
-        }"
+        points="${makePoints(
+          "macd"
+        )}"
         fill="none"
         stroke="#60a5fa"
         stroke-width="2.5"
@@ -2867,11 +3055,9 @@ function createMacdChart(
 
 
       <polyline
-        points="${
-          makePoints(
-            "signal"
-          )
-        }"
+        points="${makePoints(
+          "signal"
+        )}"
         fill="none"
         stroke="#f97316"
         stroke-width="2.5"
@@ -2890,7 +3076,7 @@ function createMacdChart(
 
 
 /* ===================================== */
-/* グリッド線                            */
+/* グリッド                              */
 /* ===================================== */
 
 function createGridLines({
@@ -2953,9 +3139,11 @@ function createGridLines({
         fill="#94a3b8"
         font-size="12"
       >
+
         ${formatter(
           value
         )}
+
       </text>
     `);
   }
@@ -2999,6 +3187,7 @@ function createDateLabels(
           index !==
             data.length - 1
         ) {
+
           return "";
         }
 
@@ -3014,11 +3203,13 @@ function createDateLabels(
             font-size="11"
             text-anchor="middle"
           >
+
             ${escapeHtml(
               item.date.slice(
                 5
               )
             )}
+
           </text>
         `;
       }
