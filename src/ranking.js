@@ -41,6 +41,7 @@ export async function createRankingResponse(env) {
           );
 
         results.push(analysis);
+
       } catch (error) {
         results.push({
           code: stock.code,
@@ -59,30 +60,41 @@ export async function createRankingResponse(env) {
           !item.error &&
           Number.isFinite(item.score)
       )
-      .sort((a, b) => b.score - a.score)
-      .map((item, index) => ({
-        ...item,
-        rank: index + 1
-      }));
+      .sort(
+        (a, b) =>
+          b.score - a.score
+      )
+      .map(
+        (item, index) => ({
+          ...item,
+          rank: index + 1
+        })
+      );
 
-    const failedResults = results.filter(
-      (item) => item.error
-    );
+    const failedResults =
+      results.filter(
+        (item) =>
+          item.error
+      );
 
     return new Response(
       createRankingHtml({
-        rankings: successfulResults,
+        rankings:
+          successfulResults,
+
         failedResults
       }),
       {
         headers: {
           "Content-Type":
             "text/html; charset=UTF-8",
+
           "Cache-Control":
             "public, max-age=300"
         }
       }
     );
+
   } catch (error) {
     return htmlError(
       error instanceof Error
@@ -97,32 +109,50 @@ async function analyzeRankingStock(
   stock,
   apiKey
 ) {
-  const cache = caches.default;
+  const cache =
+    caches.default;
 
-  const cacheKey = new Request(
-    `https://stock-ai-cache.local/ranking-v4/${stock.apiCode}`,
-    {
-      method: "GET"
-    }
-  );
+
+  // =====================================
+  // 開発中のキャッシュバージョン
+  // v5へ変更して旧戦略の結果を破棄
+  // =====================================
+
+  const cacheKey =
+    new Request(
+      `https://stock-ai-cache.local/ranking-v5/${stock.apiCode}`,
+      {
+        method: "GET"
+      }
+    );
+
 
   const cachedResponse =
-    await cache.match(cacheKey);
+    await cache.match(
+      cacheKey
+    );
+
 
   if (cachedResponse) {
     return await cachedResponse.json();
   }
 
-  const prices = await fetchDailyBars(
-    stock.apiCode,
-    apiKey
-  );
 
-  if (prices.length === 0) {
+  const prices =
+    await fetchDailyBars(
+      stock.apiCode,
+      apiKey
+    );
+
+
+  if (
+    prices.length === 0
+  ) {
     throw new Error(
       "株価データがありません"
     );
   }
+
 
   prices.sort(
     (a, b) =>
@@ -130,65 +160,130 @@ async function analyzeRankingStock(
       new Date(b.Date)
   );
 
-  const closes = prices.map(
-    (price) =>
-      Number(price.AdjC ?? price.C)
-  );
 
-  const highs = prices.map(
-    (price) =>
-      Number(price.AdjH ?? price.H)
-  );
+  const closes =
+    prices.map(
+      (price) =>
+        Number(
+          price.AdjC ??
+          price.C
+        )
+    );
 
-  const lows = prices.map(
-    (price) =>
-      Number(price.AdjL ?? price.L)
-  );
 
-  const volumes = prices.map(
-    (price) =>
-      Number(price.AdjVo ?? price.Vo)
-  );
+  const highs =
+    prices.map(
+      (price) =>
+        Number(
+          price.AdjH ??
+          price.H
+        )
+    );
+
+
+  const lows =
+    prices.map(
+      (price) =>
+        Number(
+          price.AdjL ??
+          price.L
+        )
+    );
+
+
+  const volumes =
+    prices.map(
+      (price) =>
+        Number(
+          price.AdjVo ??
+          price.Vo
+        )
+    );
+
 
   const latest =
-    prices[prices.length - 1];
+    prices[
+      prices.length - 1
+    ];
+
 
   const previous =
     prices.length >= 2
-      ? prices[prices.length - 2]
+      ? prices[
+          prices.length - 2
+        ]
       : null;
 
-  const latestClose =
-    closes[closes.length - 1];
 
-  const previousClose = previous
-    ? Number(previous.AdjC ?? previous.C)
-    : null;
+  const latestClose =
+    closes[
+      closes.length - 1
+    ];
+
+
+  const previousClose =
+    previous
+      ? Number(
+          previous.AdjC ??
+          previous.C
+        )
+      : null;
+
 
   const change =
     previousClose !== null
-      ? latestClose - previousClose
+      ? latestClose -
+        previousClose
       : null;
+
 
   const changePercent =
     previousClose
-      ? (change / previousClose) * 100
+      ? (
+          change /
+          previousClose
+        ) * 100
       : null;
 
+
+  // =====================================
+  // テクニカル指標
+  // =====================================
+
   const ma5 =
-    calculateSMA(closes, 5);
+    calculateSMA(
+      closes,
+      5
+    );
+
 
   const ma25 =
-    calculateSMA(closes, 25);
+    calculateSMA(
+      closes,
+      25
+    );
+
 
   const ma75 =
-    calculateSMA(closes, 75);
+    calculateSMA(
+      closes,
+      75
+    );
+
 
   const ma200 =
-    calculateSMA(closes, 200);
+    calculateSMA(
+      closes,
+      200
+    );
+
 
   const rsi14 =
-    calculateRSI(closes, 14);
+    calculateRSI(
+      closes,
+      14
+    );
+
 
   const bollinger =
     calculateBollingerBands(
@@ -197,17 +292,29 @@ async function analyzeRankingStock(
       2
     );
 
+
   const averageVolume20 =
-    calculateSMA(volumes, 20);
+    calculateSMA(
+      volumes,
+      20
+    );
+
 
   const latestVolume =
-    volumes[volumes.length - 1];
+    volumes[
+      volumes.length - 1
+    ];
+
 
   const volumeRatio =
-    Number.isFinite(averageVolume20) &&
+    Number.isFinite(
+      averageVolume20
+    ) &&
     averageVolume20 > 0
-      ? latestVolume / averageVolume20
+      ? latestVolume /
+        averageVolume20
       : null;
+
 
   const crossSignal =
     detectMovingAverageCross(
@@ -215,6 +322,7 @@ async function analyzeRankingStock(
       5,
       25
     );
+
 
   const atr14 =
     calculateATR(
@@ -224,6 +332,7 @@ async function analyzeRankingStock(
       14
     );
 
+
   const macdData =
     calculateMACD(
       closes,
@@ -232,25 +341,34 @@ async function analyzeRankingStock(
       9
     );
 
+
   const latestMacd =
     getLastFinite(
       macdData.macd
     );
+
 
   const latestSignal =
     getLastFinite(
       macdData.signal
     );
 
+
   const latestHistogram =
     getLastFinite(
       macdData.histogram
     );
 
+
   const recent20High =
     Math.max(
       ...highs.slice(-20)
     );
+
+
+  // =====================================
+  // サポート・レジスタンス
+  // =====================================
 
   const supportResistance =
     detectSupportResistance(
@@ -259,61 +377,112 @@ async function analyzeRankingStock(
       closes
     );
 
-  const strategy = createStrategy({
-    latestClose,
-    ma5,
-    ma25,
-    ma75,
-    ma200,
-    rsi14,
-    bollinger,
-    volumeRatio,
-    crossSignal,
-    atr14,
-    latestMacd,
-    latestSignal,
-    latestHistogram,
-    recent20High,
-    supportResistance,
-    capital: 1000000,
-    riskPercent: 1
-  });
+
+  // =====================================
+  // 新しいstrategy.jsで戦略生成
+  // =====================================
+
+  const strategy =
+    createStrategy({
+      latestClose,
+
+      ma5,
+      ma25,
+      ma75,
+      ma200,
+
+      rsi14,
+      bollinger,
+
+      volumeRatio,
+      crossSignal,
+
+      atr14,
+
+      latestMacd,
+      latestSignal,
+      latestHistogram,
+
+      recent20High,
+
+      supportResistance,
+
+      capital: 1000000,
+      riskPercent: 1
+    });
+
 
   const analysis = {
-    code: stock.code,
-    name: stock.name,
-    date: latest.Date,
+    code:
+      stock.code,
+
+    name:
+      stock.name,
+
+    date:
+      latest.Date,
 
     latestClose,
     previousClose,
+
     change,
     changePercent,
 
-    score: strategy.score,
-    stars: strategy.stars,
-    label: strategy.label,
-    className: strategy.className,
-    action: strategy.action,
-    aiComment: strategy.aiComment,
+    score:
+      strategy.score,
 
-    strengths: strategy.strengths,
-    cautions: strategy.cautions,
+    stars:
+      strategy.stars,
 
-    entryLow: strategy.entryLow,
-    entryHigh: strategy.entryHigh,
-    shortStop: strategy.shortStop,
-    target1: strategy.target1,
+    label:
+      strategy.label,
+
+    className:
+      strategy.className,
+
+    action:
+      strategy.action,
+
+    aiComment:
+      strategy.aiComment,
+
+    strengths:
+      strategy.strengths,
+
+    cautions:
+      strategy.cautions,
+
+    entryLow:
+      strategy.entryLow,
+
+    entryHigh:
+      strategy.entryHigh,
+
+    shortStop:
+      strategy.shortStop,
+
+    target1:
+      strategy.target1,
 
     rsi14,
     volumeRatio,
+
     ma5,
     ma25,
+
     latestHistogram
   };
 
+
+  // =====================================
+  // 銘柄ごとに6時間キャッシュ
+  // =====================================
+
   const responseToCache =
     new Response(
-      JSON.stringify(analysis),
+      JSON.stringify(
+        analysis
+      ),
       {
         headers: {
           "Content-Type":
@@ -325,10 +494,12 @@ async function analyzeRankingStock(
       }
     );
 
+
   await cache.put(
     cacheKey,
     responseToCache
   );
+
 
   return analysis;
 }
@@ -338,40 +509,55 @@ function createRankingHtml({
   rankings,
   failedResults
 }) {
-  const rankingCards = rankings
-    .map(
-      (item) =>
-        createRankingCard(item)
-    )
-    .join("");
+
+  const rankingCards =
+    rankings
+      .map(
+        (item) =>
+          createRankingCard(
+            item
+          )
+      )
+      .join("");
+
 
   const failedCards =
     failedResults
       .map(
         (item) => `
           <div class="ranking-error">
+
             <strong>
-              ${escapeHtml(item.name)}
+              ${escapeHtml(
+                item.name
+              )}
             </strong>
 
             <span>
-              ${escapeHtml(item.error)}
+              ${escapeHtml(
+                item.error
+              )}
             </span>
+
           </div>
         `
       )
       .join("");
+
 
   const latestDate =
     rankings.length > 0
       ? rankings[0].date
       : "-";
 
+
   return `
 <!DOCTYPE html>
+
 <html lang="ja">
 
 <head>
+
   <meta charset="UTF-8">
 
   <meta
@@ -383,16 +569,21 @@ function createRankingHtml({
     半導体株ランキング｜Stock AI
   </title>
 
+
   <style>
+
     * {
       box-sizing: border-box;
     }
 
+
     body {
       margin: 0;
       padding: 24px;
+
       background: #0f172a;
       color: #e2e8f0;
+
       font-family:
         -apple-system,
         BlinkMacSystemFont,
@@ -400,282 +591,405 @@ function createRankingHtml({
         sans-serif;
     }
 
+
     .container {
       max-width: 1050px;
       margin: 0 auto;
     }
+
 
     h1 {
       margin-bottom: 8px;
       font-size: 32px;
     }
 
+
     .sub {
       margin-bottom: 24px;
+
       color: #94a3b8;
+
       line-height: 1.7;
     }
+
 
     .navigation {
       display: flex;
       flex-wrap: wrap;
+
       gap: 10px;
+
       margin-bottom: 24px;
     }
 
+
     .navigation a {
       padding: 12px 18px;
+
       border-radius: 10px;
+
       background: #2563eb;
       color: white;
+
       font-weight: 800;
       text-decoration: none;
     }
+
 
     .ranking-list {
       display: grid;
       gap: 18px;
     }
 
+
     .ranking-card {
       display: grid;
+
       grid-template-columns:
         95px
         minmax(180px, 1fr)
         minmax(330px, 1.5fr);
 
       gap: 18px;
+
       align-items: stretch;
+
       padding: 22px;
-      border: 1px solid #334155;
+
+      border:
+        1px solid #334155;
+
       border-radius: 18px;
+
       background: #1e293b;
     }
 
+
     .rank-area {
       display: flex;
+
       flex-direction: column;
       justify-content: center;
+
       border-radius: 14px;
+
       background: #0f172a;
+
       text-align: center;
     }
+
 
     .rank-number {
       font-size: 34px;
       font-weight: 900;
     }
 
+
     .rank-text {
       color: #94a3b8;
+
       font-size: 13px;
     }
 
+
     .stock-area {
       display: flex;
+
       flex-direction: column;
       justify-content: center;
     }
+
 
     .stock-name {
       font-size: 22px;
       font-weight: 900;
     }
 
+
     .stock-code {
       margin-top: 5px;
+
       color: #94a3b8;
     }
 
+
     .price {
       margin-top: 14px;
+
       font-size: 29px;
       font-weight: 900;
     }
+
 
     .positive {
       color: #22c55e;
     }
 
+
     .negative {
       color: #ef4444;
     }
 
+
     .score-area {
       padding: 18px;
+
       border-radius: 14px;
+
       background: #0f172a;
     }
+
 
     .score-top {
       display: flex;
       flex-wrap: wrap;
+
       gap: 10px 18px;
+
       align-items: center;
-      justify-content: space-between;
+
+      justify-content:
+        space-between;
     }
+
 
     .score {
       font-size: 32px;
       font-weight: 900;
     }
 
+
     .label {
       padding: 8px 12px;
+
       border-radius: 999px;
+
       font-weight: 900;
     }
 
+
     .buy {
       color: #4ade80;
-      background: rgba(34, 197, 94, 0.18);
+
+      background:
+        rgba(34, 197, 94, 0.18);
     }
+
 
     .wait {
       color: #facc15;
-      background: rgba(234, 179, 8, 0.18);
+
+      background:
+        rgba(234, 179, 8, 0.18);
     }
+
 
     .danger {
       color: #f87171;
-      background: rgba(239, 68, 68, 0.18);
+
+      background:
+        rgba(239, 68, 68, 0.18);
     }
+
 
     .price-grid {
       display: grid;
+
       grid-template-columns:
         repeat(
           3,
           minmax(0, 1fr)
         );
+
       gap: 9px;
+
       margin-top: 15px;
     }
 
+
     .price-box {
       padding: 11px;
+
       border-radius: 9px;
+
       background: #172033;
     }
 
+
     .price-label {
       color: #94a3b8;
+
       font-size: 12px;
     }
 
+
     .price-value {
       margin-top: 4px;
+
       font-weight: 900;
     }
+
 
     .entry {
       color: #38bdf8;
     }
 
+
     .stop {
       color: #fb923c;
     }
+
 
     .target {
       color: #4ade80;
     }
 
+
     .action {
       margin-top: 14px;
+
       color: #cbd5e1;
+
       line-height: 1.6;
     }
+
 
     .indicators {
       display: flex;
       flex-wrap: wrap;
+
       gap: 8px;
+
       margin-top: 13px;
     }
+
 
     .indicator {
       padding: 6px 9px;
+
       border-radius: 8px;
+
       background: #172033;
+
       color: #cbd5e1;
+
       font-size: 12px;
     }
 
+
     .detail-link {
       display: inline-block;
+
       margin-top: 13px;
+
       color: #60a5fa;
+
       font-weight: 800;
       text-decoration: none;
     }
 
+
     .ranking-error {
       display: flex;
-      justify-content: space-between;
+
+      justify-content:
+        space-between;
+
       gap: 15px;
+
       margin-top: 12px;
       padding: 15px;
-      border: 1px solid #ef4444;
+
+      border:
+        1px solid #ef4444;
+
       border-radius: 10px;
-      background: rgba(239, 68, 68, 0.12);
+
+      background:
+        rgba(239, 68, 68, 0.12);
+
       color: #fca5a5;
     }
 
+
     .notice {
       margin-top: 24px;
+
       padding: 16px;
+
       border-radius: 12px;
+
       background: #1e293b;
+
       color: #94a3b8;
+
       font-size: 13px;
+
       line-height: 1.7;
     }
+
 
     @media (
       max-width: 800px
     ) {
+
       body {
         padding: 14px;
       }
+
 
       h1 {
         font-size: 25px;
       }
 
+
       .ranking-card {
         grid-template-columns: 1fr;
       }
+
 
       .rank-area {
         min-height: 85px;
       }
 
+
       .price-grid {
         grid-template-columns: 1fr;
       }
     }
+
   </style>
+
 </head>
+
 
 <body>
 
   <main class="container">
 
+
     <h1>
       半導体株 AIランキング
     </h1>
 
+
     <div class="sub">
+
       最新取得日：
-      ${escapeHtml(latestDate)}
+      ${escapeHtml(
+        latestDate
+      )}
 
       <br>
 
       日足のトレンド、移動平均線、
       RSI、MACD、出来高、
-      ボリンジャーバンドを
+      ボリンジャーバンド、
+      サポート・レジスタンスを
       共通条件で採点しています。
+
     </div>
+
 
     <nav class="navigation">
 
@@ -689,7 +1003,9 @@ function createRankingHtml({
 
     </nav>
 
+
     <section class="ranking-list">
+
       ${
         rankingCards ||
         `
@@ -698,7 +1014,9 @@ function createRankingHtml({
           </div>
         `
       }
+
     </section>
+
 
     ${
       failedCards
@@ -716,16 +1034,20 @@ function createRankingHtml({
         : ""
     }
 
+
     <div class="notice">
+
       この順位は、
       現在のコードに実装されている
-      テクニカル指標のスコア比較です。
+      テクニカル指標と価格帯分析の
+      スコア比較です。
 
       将来の値上がりを保証する予測ではありません。
 
       J-Quantsの日足データは
       プランに応じた提供範囲と
       更新時刻になります。
+
     </div>
 
   </main>
@@ -737,21 +1059,33 @@ function createRankingHtml({
 }
 
 
-function createRankingCard(item) {
+function createRankingCard(
+  item
+) {
+
   const isPositive =
-    Number.isFinite(item.change) &&
+    Number.isFinite(
+      item.change
+    ) &&
     item.change >= 0;
+
 
   const changeClass =
     isPositive
       ? "positive"
       : "negative";
 
+
   const sign =
-    isPositive ? "+" : "";
+    isPositive
+      ? "+"
+      : "";
+
 
   const changeText =
-    Number.isFinite(item.change) &&
+    Number.isFinite(
+      item.change
+    ) &&
     Number.isFinite(
       item.changePercent
     )
@@ -762,17 +1096,26 @@ function createRankingCard(item) {
         )}%）`
       : "-";
 
+
   const volumeText =
-    Number.isFinite(item.volumeRatio)
+    Number.isFinite(
+      item.volumeRatio
+    )
       ? `${item.volumeRatio.toFixed(
           2
         )}倍`
       : "-";
 
+
   const rsiText =
-    Number.isFinite(item.rsi14)
-      ? item.rsi14.toFixed(1)
+    Number.isFinite(
+      item.rsi14
+    )
+      ? item.rsi14.toFixed(
+          1
+        )
       : "-";
+
 
   const histogramText =
     Number.isFinite(
@@ -783,8 +1126,11 @@ function createRankingCard(item) {
         )
       : "-";
 
+
   return `
+
     <article class="ranking-card">
+
 
       <div class="rank-area">
 
@@ -798,15 +1144,22 @@ function createRankingCard(item) {
 
       </div>
 
+
       <div class="stock-area">
 
         <div class="stock-name">
-          ${escapeHtml(item.name)}
+          ${escapeHtml(
+            item.name
+          )}
         </div>
 
+
         <div class="stock-code">
-          ${escapeHtml(item.code)}
+          ${escapeHtml(
+            item.code
+          )}
         </div>
+
 
         <div class="price">
           ${formatNumber(
@@ -814,9 +1167,11 @@ function createRankingCard(item) {
           )}円
         </div>
 
+
         <div class="${changeClass}">
           ${changeText}
         </div>
+
 
         <a
           class="detail-link"
@@ -829,7 +1184,9 @@ function createRankingCard(item) {
 
       </div>
 
+
       <div class="score-area">
+
 
         <div class="score-top">
 
@@ -837,18 +1194,23 @@ function createRankingCard(item) {
             ${item.score}点
           </div>
 
+
           <div
             class="
               label
               ${item.className}
             "
           >
-            ${escapeHtml(item.label)}
+            ${escapeHtml(
+              item.label
+            )}
           </div>
 
         </div>
 
+
         <div class="price-grid">
+
 
           <div class="price-box">
 
@@ -857,16 +1219,20 @@ function createRankingCard(item) {
             </div>
 
             <div class="price-value entry">
+
               ${formatNumber(
                 item.entryLow
               )}
               ～
+
               ${formatNumber(
                 item.entryHigh
               )}円
+
             </div>
 
           </div>
+
 
           <div class="price-box">
 
@@ -875,12 +1241,15 @@ function createRankingCard(item) {
             </div>
 
             <div class="price-value stop">
+
               ${formatNumber(
                 item.shortStop
               )}円
+
             </div>
 
           </div>
+
 
           <div class="price-box">
 
@@ -889,14 +1258,18 @@ function createRankingCard(item) {
             </div>
 
             <div class="price-value target">
+
               ${formatNumber(
                 item.target1
               )}円
+
             </div>
 
           </div>
 
+
         </div>
+
 
         <div class="indicators">
 
@@ -914,11 +1287,16 @@ function createRankingCard(item) {
 
         </div>
 
+
         <div class="action">
-          ${escapeHtml(item.action)}
+          ${escapeHtml(
+            item.action
+          )}
         </div>
 
+
       </div>
+
 
     </article>
   `;
