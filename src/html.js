@@ -34,7 +34,9 @@ export function createHtml({
   supportResistance,
   chartData,
   capital,
-  riskPercent
+  riskPercent,
+  tradeMode,
+  marginRate
 }) {
 
   const isPositive =
@@ -70,9 +72,15 @@ export function createHtml({
       : strategy.score;
 
 
-  // =====================================
-  // 100株リスク管理
-  // =====================================
+  const isMargin =
+    tradeMode === "margin";
+
+
+  const tradeModeLabel =
+    isMargin
+      ? "信用取引"
+      : "現物取引";
+
 
   const minimumLotTradeValue =
     Number.isFinite(
@@ -108,30 +116,6 @@ export function createHtml({
     );
 
 
-  const minimumLotRiskMultiple =
-    Number.isFinite(
-      strategy.minimumLotRiskMultiple
-    )
-      ? strategy.minimumLotRiskMultiple
-      : null;
-
-
-  const minimumLotCapitalRiskPercent =
-    Number.isFinite(
-      strategy.minimumLotCapitalRiskPercent
-    )
-      ? strategy.minimumLotCapitalRiskPercent
-      : null;
-
-
-  const minimumLotCapitalMultiple =
-    Number.isFinite(
-      strategy.minimumLotCapitalMultiple
-    )
-      ? strategy.minimumLotCapitalMultiple
-      : null;
-
-
   const requiredCapitalFor100 =
     Number.isFinite(
       strategy.requiredCapitalFor100
@@ -156,9 +140,21 @@ export function createHtml({
       : null;
 
 
-  // =====================================
-  // 直近10営業日
-  // =====================================
+  const minimumRequiredFunds =
+    Number.isFinite(
+      strategy.minimumRequiredFunds
+    )
+      ? strategy.minimumRequiredFunds
+      : null;
+
+
+  const fundingShortfall =
+    Number.isFinite(
+      strategy.fundingShortfall
+    )
+      ? strategy.fundingShortfall
+      : null;
+
 
   const rows =
     recentPrices
@@ -338,7 +334,9 @@ export function createHtml({
       grid-template-columns:
         1fr
         1fr
-        1fr
+        0.8fr
+        0.9fr
+        0.8fr
         auto;
 
       gap: 10px;
@@ -347,7 +345,8 @@ export function createHtml({
     }
 
 
-    .search input {
+    .search input,
+    .search select {
       width: 100%;
 
       padding: 14px;
@@ -360,7 +359,7 @@ export function createHtml({
       background: #1e293b;
       color: white;
 
-      font-size: 16px;
+      font-size: 15px;
     }
 
 
@@ -566,9 +565,15 @@ export function createHtml({
     }
 
 
-    /* ================================= */
-    /* AI評価                            */
-    /* ================================= */
+    .funding-ok {
+      color: #4ade80;
+    }
+
+
+    .funding-bad {
+      color: #f87171;
+    }
+
 
     .simple-card {
       padding: 30px;
@@ -846,10 +851,6 @@ export function createHtml({
     }
 
 
-    /* ================================= */
-    /* リスク警告                        */
-    /* ================================= */
-
     .risk-warning {
       margin-top: 18px;
       margin-bottom: 22px;
@@ -1009,7 +1010,67 @@ export function createHtml({
     }
 
 
-    .solution-note {
+    .funding-card {
+      margin-top: 20px;
+
+      padding: 20px;
+
+      border:
+        1px solid #475569;
+
+      border-radius: 14px;
+
+      background: #111827;
+    }
+
+
+    .funding-title {
+      font-size: 18px;
+      font-weight: 900;
+    }
+
+
+    .funding-grid {
+      display: grid;
+
+      grid-template-columns:
+        repeat(
+          auto-fit,
+          minmax(170px, 1fr)
+        );
+
+      gap: 10px;
+
+      margin-top: 14px;
+    }
+
+
+    .funding-box {
+      padding: 14px;
+
+      border-radius: 10px;
+
+      background: #0f172a;
+    }
+
+
+    .funding-label {
+      color: #94a3b8;
+
+      font-size: 12px;
+    }
+
+
+    .funding-value {
+      margin-top: 5px;
+
+      font-size: 20px;
+      font-weight: 900;
+    }
+
+
+    .solution-note,
+    .notice {
       margin-top: 15px;
 
       color: #cbd5e1;
@@ -1021,19 +1082,9 @@ export function createHtml({
 
 
     .notice {
-      margin-top: 18px;
-
       color: #94a3b8;
-
-      font-size: 13px;
-
-      line-height: 1.7;
     }
 
-
-    /* ================================= */
-    /* テーブル                          */
-    /* ================================= */
 
     .table-wrap {
       overflow-x: auto;
@@ -1075,6 +1126,19 @@ export function createHtml({
 
     .close {
       font-weight: bold;
+    }
+
+
+    @media (
+      max-width: 900px
+    ) {
+
+      .search {
+        grid-template-columns:
+          1fr
+          1fr;
+      }
+
     }
 
 
@@ -1199,16 +1263,55 @@ export function createHtml({
       >
 
 
+      <select name="trade">
+
+        <option
+          value="margin"
+          ${
+            isMargin
+              ? "selected"
+              : ""
+          }
+        >
+          信用取引
+        </option>
+
+        <option
+          value="cash"
+          ${
+            !isMargin
+              ? "selected"
+              : ""
+          }
+        >
+          現物取引
+        </option>
+
+      </select>
+
+
+      <input
+        type="number"
+        name="margin"
+        value="${marginRate}"
+        placeholder="保証金率%"
+        min="1"
+        max="100"
+        step="1"
+        ${
+          !isMargin
+            ? "disabled"
+            : ""
+        }
+      >
+
+
       <button type="submit">
         分析する
       </button>
 
     </form>
 
-
-    <!-- ================================= -->
-    <!-- AI評価                            -->
-    <!-- ================================= -->
 
     <section class="card simple-card">
 
@@ -1466,10 +1569,6 @@ export function createHtml({
     </section>
 
 
-    <!-- ================================= -->
-    <!-- 価格帯分析                        -->
-    <!-- ================================= -->
-
     <section class="card">
 
       <h2>
@@ -1586,23 +1685,8 @@ export function createHtml({
 
       </div>
 
-
-      <div class="notice">
-
-        直近60営業日の高値・安値から、
-        現在値の上下15％以内にある
-        価格帯を自動検出しています。
-
-        将来の反発や反落を保証するものではありません。
-
-      </div>
-
     </section>
 
-
-    <!-- ================================= -->
-    <!-- 現在値                            -->
-    <!-- ================================= -->
 
     <section class="card">
 
@@ -1663,15 +1747,167 @@ export function createHtml({
     </section>
 
 
-    <!-- ================================= -->
-    <!-- リスク管理                        -->
-    <!-- ================================= -->
-
     <section class="card">
 
       <h2>
         リスク管理
       </h2>
+
+
+      <div class="funding-card">
+
+        <div class="funding-title">
+
+          取引資金チェック
+          ／
+          ${tradeModeLabel}
+
+        </div>
+
+
+        <div class="funding-grid">
+
+
+          <div class="funding-box">
+
+            <div class="funding-label">
+              100株の建玉金額
+            </div>
+
+            <div class="funding-value position">
+
+              ${
+                Number.isFinite(
+                  minimumLotTradeValue
+                )
+                  ? `${formatNumber(
+                      minimumLotTradeValue
+                    )}円`
+                  : "-"
+              }
+
+            </div>
+
+          </div>
+
+
+          ${
+            isMargin
+              ? `
+                <div class="funding-box">
+
+                  <div class="funding-label">
+                    設定保証金率
+                  </div>
+
+                  <div class="funding-value">
+                    ${marginRate}%
+                  </div>
+
+                </div>
+
+
+                <div class="funding-box">
+
+                  <div class="funding-label">
+                    必要保証金目安
+                  </div>
+
+                  <div class="funding-value position">
+
+                    ${formatNumber(
+                      strategy.requiredMarginFor100
+                    )}円
+
+                  </div>
+
+                </div>
+              `
+              : `
+                <div class="funding-box">
+
+                  <div class="funding-label">
+                    必要現金
+                  </div>
+
+                  <div class="funding-value position">
+
+                    ${formatNumber(
+                      strategy.requiredCashFor100
+                    )}円
+
+                  </div>
+
+                </div>
+              `
+          }
+
+
+          <div class="funding-box">
+
+            <div class="funding-label">
+              入力資金
+            </div>
+
+            <div class="funding-value">
+              ${formatNumber(
+                capital
+              )}円
+            </div>
+
+          </div>
+
+
+          <div class="funding-box">
+
+            <div class="funding-label">
+
+              ${
+                strategy.canAffordMinimumLot
+                  ? "資金判定"
+                  : "資金不足額"
+              }
+
+            </div>
+
+            <div
+              class="
+                funding-value
+                ${
+                  strategy.canAffordMinimumLot
+                    ? "funding-ok"
+                    : "funding-bad"
+                }
+              "
+            >
+
+              ${
+                strategy.canAffordMinimumLot
+                  ? "100株建玉可能"
+                  : `${formatNumber(
+                      fundingShortfall
+                    )}円不足`
+              }
+
+            </div>
+
+          </div>
+
+
+        </div>
+
+
+        <div class="notice">
+
+          ${
+            isMargin
+              ? `必要保証金は建玉金額 × ${marginRate}% で単純計算した目安です。実際の信用余力・委託保証金率・代用有価証券・維持率・証券会社の規制などは別途影響します。`
+              : "現物取引は、買い候補中心価格で100株購入するために必要な現金を表示しています。"
+          }
+
+        </div>
+
+      </div>
 
 
       ${
@@ -1683,49 +1919,27 @@ export function createHtml({
               <div class="risk-warning-title">
 
                 ⚠ 100株では
-                リスク上限を超えます
+                損失リスク上限を超えます
 
               </div>
 
 
               <div class="risk-warning-main">
 
+                資金面で100株を建てられるかどうかと、
+                損失リスクが適正かどうかは別です。
+
                 現在設定している
                 「1回の許容損失
                 ${riskPercent}%」
                 では、
-
-                100株を現在の損切り幅で
-                取引すると、
-                設定したリスク上限を超えます。
+                100株の損失想定が
+                リスク上限を超えています。
 
               </div>
 
 
               <div class="risk-warning-grid">
-
-
-                <div class="risk-warning-box">
-
-                  <div class="risk-warning-label">
-                    100株の売買金額
-                  </div>
-
-                  <div class="risk-warning-value">
-
-                    ${
-                      Number.isFinite(
-                        minimumLotTradeValue
-                      )
-                        ? `${formatNumber(
-                            minimumLotTradeValue
-                          )}円`
-                        : "-"
-                    }
-
-                  </div>
-
-                </div>
 
 
                 <div class="risk-warning-box">
@@ -1772,9 +1986,9 @@ export function createHtml({
 
                     ${
                       Number.isFinite(
-                        minimumLotRiskMultiple
+                        strategy.minimumLotRiskMultiple
                       )
-                        ? `約${minimumLotRiskMultiple.toFixed(
+                        ? `約${strategy.minimumLotRiskMultiple.toFixed(
                             1
                           )}倍`
                         : "-"
@@ -1795,34 +2009,11 @@ export function createHtml({
 
                     ${
                       Number.isFinite(
-                        minimumLotCapitalRiskPercent
+                        strategy.minimumLotCapitalRiskPercent
                       )
-                        ? `${minimumLotCapitalRiskPercent.toFixed(
+                        ? `${strategy.minimumLotCapitalRiskPercent.toFixed(
                             1
                           )}%`
-                        : "-"
-                    }
-
-                  </div>
-
-                </div>
-
-
-                <div class="risk-warning-box">
-
-                  <div class="risk-warning-label">
-                    100株売買金額 ÷ 投資資金
-                  </div>
-
-                  <div class="risk-warning-value">
-
-                    ${
-                      Number.isFinite(
-                        minimumLotCapitalMultiple
-                      )
-                        ? `約${minimumLotCapitalMultiple.toFixed(
-                            1
-                          )}倍`
                         : "-"
                     }
 
@@ -1924,25 +2115,6 @@ export function createHtml({
 
                 </div>
 
-
-                <div class="solution-note">
-
-                  「理論上の損切り上限」は、
-                  資金管理だけから逆算した価格です。
-
-                  チャート上のサポートやATRを無視して
-                  損切りを近づけると、
-                  通常の値動きだけで損切りされる
-                  可能性があります。
-
-                  そのため、
-                  チャート上の合理的な損切り位置と
-                  資金管理が両立しない場合は、
-                  無理に100株を取引しない判断を
-                  優先します。
-
-                </div>
-
               </div>
 
 
@@ -1953,19 +2125,6 @@ export function createHtml({
 
 
       <div class="risk-grid">
-
-
-        ${strategyBox(
-          "100株の売買金額",
-          Number.isFinite(
-            strategy.minimumLotTradeValue
-          )
-            ? `${formatNumber(
-                strategy.minimumLotTradeValue
-              )}円`
-            : "-",
-          "position"
-        )}
 
 
         ${strategyBox(
@@ -2022,48 +2181,22 @@ export function createHtml({
         )}
 
 
-        ${
-          Number.isFinite(
-            strategy.requiredCapital
-          )
-            ? strategyBox(
-                "適正株数に必要な資金",
-                `${formatNumber(
-                  strategy.requiredCapital
-                )}円`,
-                "position"
-              )
-            : ""
-        }
-
-
       </div>
 
 
       <div class="notice">
 
-        投資資金
-        ${formatNumber(capital)}円、
+        適正株数は
+        「現在の損切り幅」と
+        「設定した許容損失率」から計算しています。
 
-        1回の許容損失率
-        ${riskPercent}%で計算しています。
-
-        日本株の100株単位に
-        切り下げています。
-
-        適正株数が0株の場合は、
-        現在の損切り幅では
-        設定した許容損失内に
-        100株を収められないことを意味します。
+        信用取引で建玉可能でも、
+        適正株数が0株になることはあります。
 
       </div>
 
     </section>
 
-
-    <!-- ================================= -->
-    <!-- 株価チャート                      -->
-    <!-- ================================= -->
 
     <section class="card">
 
@@ -2112,10 +2245,6 @@ export function createHtml({
     </section>
 
 
-    <!-- ================================= -->
-    <!-- 出来高                            -->
-    <!-- ================================= -->
-
     <section class="card">
 
       <h2>
@@ -2133,10 +2262,6 @@ export function createHtml({
 
     </section>
 
-
-    <!-- ================================= -->
-    <!-- MACD                              -->
-    <!-- ================================= -->
 
     <section class="card">
 
@@ -2168,10 +2293,6 @@ export function createHtml({
 
     </section>
 
-
-    <!-- ================================= -->
-    <!-- テクニカル                        -->
-    <!-- ================================= -->
 
     <section class="card">
 
@@ -2312,10 +2433,6 @@ export function createHtml({
     </section>
 
 
-    <!-- ================================= -->
-    <!-- 直近10営業日                      -->
-    <!-- ================================= -->
-
     <section class="card">
 
       <h2>
@@ -2344,23 +2461,10 @@ export function createHtml({
 
 
           <tbody>
-
             ${rows}
-
           </tbody>
 
         </table>
-
-      </div>
-
-
-      <div class="notice">
-
-        J-Quantsで取得可能な日付の
-        データを使用しています。
-
-        無料プランでは
-        現在価格ではありません。
 
       </div>
 
@@ -2376,10 +2480,6 @@ export function createHtml({
 }
 
 
-/* ===================================== */
-/* 共通BOX                               */
-/* ===================================== */
-
 function detailBox(
   label,
   value
@@ -2389,19 +2489,11 @@ function detailBox(
     <div class="detail-item">
 
       <div class="detail-label">
-
-        ${escapeHtml(
-          label
-        )}
-
+        ${escapeHtml(label)}
       </div>
 
       <div class="detail-value">
-
-        ${escapeHtml(
-          value
-        )}
-
+        ${escapeHtml(value)}
       </div>
 
     </div>
@@ -2419,11 +2511,7 @@ function strategyBox(
     <div class="strategy-item">
 
       <div class="detail-label">
-
-        ${escapeHtml(
-          label
-        )}
-
+        ${escapeHtml(label)}
       </div>
 
       <div
@@ -2432,21 +2520,13 @@ function strategyBox(
           ${className}
         "
       >
-
-        ${escapeHtml(
-          value
-        )}
-
+        ${escapeHtml(value)}
       </div>
 
     </div>
   `;
 }
 
-
-/* ===================================== */
-/* 株価チャート                          */
-/* ===================================== */
 
 function createPriceChart(
   data
@@ -2516,9 +2596,13 @@ function createPriceChart(
     1;
 
 
+  // 0円未満にはしない
   const minValue =
-    rawMin -
-    range * 0.08;
+    Math.max(
+      0,
+      rawMin -
+      range * 0.08
+    );
 
 
   const maxValue =
@@ -2559,7 +2643,8 @@ function createPriceChart(
           maxValue -
           value
         ) /
-        (
+        Math.max(
+          1,
           maxValue -
           minValue
         )
@@ -2581,19 +2666,14 @@ function createPriceChart(
                 item[key]
               )
             ) {
-
               return null;
             }
 
 
             return `${
-              x(
-                index
-              ).toFixed(1)
+              x(index).toFixed(1)
             },${
-              y(
-                item[key]
-              ).toFixed(1)
+              y(item[key]).toFixed(1)
             }`;
           }
         )
@@ -2615,8 +2695,9 @@ function createPriceChart(
 
         formatter:
           (value) =>
-            Math.round(
-              value
+            Math.max(
+              0,
+              Math.round(value)
             ).toLocaleString(
               "ja-JP"
             )
@@ -2631,9 +2712,7 @@ function createPriceChart(
 
 
       <polyline
-        points="${makePoints(
-          "close"
-        )}"
+        points="${makePoints("close")}"
         fill="none"
         stroke="#e2e8f0"
         stroke-width="3"
@@ -2641,9 +2720,7 @@ function createPriceChart(
 
 
       <polyline
-        points="${makePoints(
-          "ma5"
-        )}"
+        points="${makePoints("ma5")}"
         fill="none"
         stroke="#38bdf8"
         stroke-width="2.5"
@@ -2651,9 +2728,7 @@ function createPriceChart(
 
 
       <polyline
-        points="${makePoints(
-          "ma25"
-        )}"
+        points="${makePoints("ma25")}"
         fill="none"
         stroke="#facc15"
         stroke-width="2.5"
@@ -2661,9 +2736,7 @@ function createPriceChart(
 
 
       <polyline
-        points="${makePoints(
-          "ma75"
-        )}"
+        points="${makePoints("ma75")}"
         fill="none"
         stroke="#a855f7"
         stroke-width="2.2"
@@ -2671,9 +2744,7 @@ function createPriceChart(
 
 
       <polyline
-        points="${makePoints(
-          "ma200"
-        )}"
+        points="${makePoints("ma200")}"
         fill="none"
         stroke="#fb7185"
         stroke-width="2.2"
@@ -2746,19 +2817,14 @@ function makeNestedPoints(
             value
           )
         ) {
-
           return null;
         }
 
 
         return `${
-          x(
-            index
-          ).toFixed(1)
+          x(index).toFixed(1)
         },${
-          y(
-            value
-          ).toFixed(1)
+          y(value).toFixed(1)
         }`;
       }
     )
@@ -2766,10 +2832,6 @@ function makeNestedPoints(
     .join(" ");
 }
 
-
-/* ===================================== */
-/* 出来高チャート                        */
-/* ===================================== */
 
 function createVolumeChart(
   data
@@ -2925,10 +2987,6 @@ function createVolumeChart(
 }
 
 
-/* ===================================== */
-/* MACDチャート                          */
-/* ===================================== */
-
 function createMacdChart(
   data
 ) {
@@ -3060,19 +3118,14 @@ function createMacdChart(
                 item[key]
               )
             ) {
-
               return null;
             }
 
 
             return `${
-              x(
-                index
-              ).toFixed(1)
+              x(index).toFixed(1)
             },${
-              y(
-                item[key]
-              ).toFixed(1)
+              y(item[key]).toFixed(1)
             }`;
           }
         )
@@ -3113,9 +3166,7 @@ function createMacdChart(
 
 
       <polyline
-        points="${makePoints(
-          "macd"
-        )}"
+        points="${makePoints("macd")}"
         fill="none"
         stroke="#60a5fa"
         stroke-width="2.5"
@@ -3123,9 +3174,7 @@ function createMacdChart(
 
 
       <polyline
-        points="${makePoints(
-          "signal"
-        )}"
+        points="${makePoints("signal")}"
         fill="none"
         stroke="#f97316"
         stroke-width="2.5"
@@ -3142,10 +3191,6 @@ function createMacdChart(
   `;
 }
 
-
-/* ===================================== */
-/* グリッド                              */
-/* ===================================== */
 
 function createGridLines({
   width,
@@ -3179,9 +3224,7 @@ function createGridLines({
 
 
     const gridY =
-      y(
-        value
-      );
+      y(value);
 
 
     lines.push(`
@@ -3208,9 +3251,7 @@ function createGridLines({
         font-size="12"
       >
 
-        ${formatter(
-          value
-        )}
+        ${formatter(value)}
 
       </text>
     `);
@@ -3220,10 +3261,6 @@ function createGridLines({
   return lines.join("");
 }
 
-
-/* ===================================== */
-/* 日付ラベル                            */
-/* ===================================== */
 
 function createDateLabels(
   data,
