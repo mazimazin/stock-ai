@@ -360,235 +360,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 4. エントリー評価
-  // =====================================
-
-  let entryScore = 50;
-
-  const entryReasons = [];
-  const entryCautions = [];
-
-
-  if (Number.isFinite(rsi14)) {
-
-    if (rsi14 >= 80) {
-
-      entryScore -= 30;
-
-      entryCautions.push(
-        `RSIが${rsi14.toFixed(1)}で非常に過熱しています`
-      );
-
-    } else if (rsi14 >= 70) {
-
-      entryScore -= 20;
-
-      entryCautions.push(
-        `RSIが${rsi14.toFixed(1)}で短期的に過熱しています`
-      );
-
-    } else if (
-      rsi14 >= 45 &&
-      rsi14 <= 65
-    ) {
-
-      entryScore += 10;
-
-      entryReasons.push(
-        "RSIは極端な過熱感のない水準です"
-      );
-
-    } else if (rsi14 <= 30) {
-
-      entryScore -= 5;
-
-      entryCautions.push(
-        `RSIが${rsi14.toFixed(1)}で売られ過ぎですが、下落継続リスクがあります`
-      );
-    }
-  }
-
-
-  if (
-    bollinger &&
-    Number.isFinite(
-      bollinger.upper
-    ) &&
-    Number.isFinite(
-      bollinger.lower
-    )
-  ) {
-
-    if (
-      latestClose >
-      bollinger.upper
-    ) {
-
-      entryScore -= 15;
-
-      entryCautions.push(
-        "株価がボリンジャーバンド+2σを上回っており、追い買いには注意が必要です"
-      );
-
-    } else if (
-      latestClose <
-      bollinger.lower
-    ) {
-
-      entryScore -= 5;
-
-      entryCautions.push(
-        "株価がボリンジャーバンド-2σを下回っており、反発確認が必要です"
-      );
-    }
-  }
-
-
-  if (
-    supportPrice !== null &&
-    supportDistancePercent !== null
-  ) {
-
-    if (
-      supportDistancePercent <= 2
-    ) {
-
-      entryScore += 18;
-
-      entryReasons.push(
-        `現在値の約${supportDistancePercent.toFixed(1)}%下に直近サポートがあります`
-      );
-
-    } else if (
-      supportDistancePercent <= 4
-    ) {
-
-      entryScore += 12;
-
-      entryReasons.push(
-        `現在値の約${supportDistancePercent.toFixed(1)}%下にサポートがあります`
-      );
-
-    } else if (
-      supportDistancePercent <= 7
-    ) {
-
-      entryScore += 6;
-
-      entryReasons.push(
-        "比較的近い位置にサポートがあります"
-      );
-
-    } else {
-
-      entryScore -= 5;
-
-      entryCautions.push(
-        "直近サポートまで距離があり、下値余地に注意が必要です"
-      );
-    }
-
-
-    if (
-      Number.isFinite(
-        nearestSupport?.touches
-      ) &&
-      nearestSupport.touches >= 3
-    ) {
-
-      entryScore += 5;
-
-      entryReasons.push(
-        "直近サポート付近で複数回の価格反応があります"
-      );
-    }
-  }
-
-
-  if (
-    resistancePrice !== null &&
-    resistanceDistancePercent !== null
-  ) {
-
-    if (
-      resistanceDistancePercent <= 1.5
-    ) {
-
-      entryScore -= 20;
-
-      entryCautions.push(
-        "現在値のすぐ上にレジスタンスがあります"
-      );
-
-    } else if (
-      resistanceDistancePercent <= 3
-    ) {
-
-      entryScore -= 10;
-
-      entryCautions.push(
-        "現在値の近くに上値抵抗があります"
-      );
-
-    } else if (
-      resistanceDistancePercent <= 5
-    ) {
-
-      entryScore -= 3;
-
-      entryCautions.push(
-        "比較的近い位置にレジスタンスがあります"
-      );
-
-    } else {
-
-      entryScore += 8;
-
-      entryReasons.push(
-        "直近レジスタンスまで一定の上値余地があります"
-      );
-    }
-  }
-
-
-  if (bullishTrend) {
-
-    entryScore += 8;
-
-    entryReasons.push(
-      "短期上昇トレンドが維持されています"
-    );
-  }
-
-
-  if (macdBullish) {
-    entryScore += 5;
-  }
-
-
-  entryScore =
-    Math.max(
-      0,
-      Math.min(
-        100,
-        Math.round(entryScore)
-      )
-    );
-
-
-  // =====================================
-  // 5. 総合スコア
-  // =====================================
-
-  const score =
-    Math.round(
-      trendScore * 0.6 +
-      entryScore * 0.4
-    );
-
-
-  // =====================================
-  // 6. 買い候補
+  // 4. 買い候補
   // =====================================
 
   const usableSupport =
@@ -640,6 +412,7 @@ export function createStrategy({
     entryHigh <
     entryLow
   ) {
+
     entryHigh =
       entryLow;
   }
@@ -653,7 +426,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 7. 損切り
+  // 5. 損切り
   // =====================================
 
   let shortStop;
@@ -737,7 +510,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 8. 1株あたりリスク
+  // 6. 1株あたりリスク
   // =====================================
 
   const shortRiskPerShare =
@@ -757,7 +530,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 9. 利確
+  // 7. 利確
   // =====================================
 
   const minimumTarget1 =
@@ -809,7 +582,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 10. リスクリワード
+  // 8. 買い候補中心からのRR
   // =====================================
 
   const riskReward1 =
@@ -829,7 +602,498 @@ export function createStrategy({
 
 
   // =====================================
-  // 11. リスク管理
+  // 9. 現在値から見た実戦RR
+  // =====================================
+
+  const currentRiskPerShare =
+    latestClose >
+    shortStop
+      ? latestClose -
+        shortStop
+      : 1;
+
+
+  const currentReward1PerShare =
+    Math.max(
+      0,
+      target1 -
+      latestClose
+    );
+
+
+  const currentReward2PerShare =
+    Math.max(
+      0,
+      target2 -
+      latestClose
+    );
+
+
+  const currentRiskReward1 =
+    currentRiskPerShare > 0
+      ? currentReward1PerShare /
+        currentRiskPerShare
+      : 0;
+
+
+  const currentRiskReward2 =
+    currentRiskPerShare > 0
+      ? currentReward2PerShare /
+        currentRiskPerShare
+      : 0;
+
+
+  // =====================================
+  // 10. エントリー評価
+  // =====================================
+
+  let entryScore = 50;
+
+  const entryReasons = [];
+  const entryCautions = [];
+
+
+  // -------------------------------------
+  // RSI
+  // -------------------------------------
+
+  if (Number.isFinite(rsi14)) {
+
+    if (rsi14 >= 80) {
+
+      entryScore -= 30;
+
+      entryCautions.push(
+        `RSIが${rsi14.toFixed(1)}で非常に過熱しています`
+      );
+
+    } else if (rsi14 >= 70) {
+
+      entryScore -= 20;
+
+      entryCautions.push(
+        `RSIが${rsi14.toFixed(1)}で短期的に過熱しています`
+      );
+
+    } else if (
+      rsi14 >= 45 &&
+      rsi14 <= 65
+    ) {
+
+      entryScore += 10;
+
+      entryReasons.push(
+        "RSIは極端な過熱感のない水準です"
+      );
+
+    } else if (rsi14 <= 30) {
+
+      entryScore -= 5;
+
+      entryCautions.push(
+        `RSIが${rsi14.toFixed(1)}で売られ過ぎですが、下落継続リスクがあります`
+      );
+    }
+  }
+
+
+  // -------------------------------------
+  // ボリンジャーバンド
+  // -------------------------------------
+
+  if (
+    bollinger &&
+    Number.isFinite(
+      bollinger.upper
+    ) &&
+    Number.isFinite(
+      bollinger.lower
+    )
+  ) {
+
+    if (
+      latestClose >
+      bollinger.upper
+    ) {
+
+      entryScore -= 15;
+
+      entryCautions.push(
+        "株価がボリンジャーバンド+2σを上回っており、追い買いには注意が必要です"
+      );
+
+    } else if (
+      latestClose <
+      bollinger.lower
+    ) {
+
+      entryScore -= 5;
+
+      entryCautions.push(
+        "株価がボリンジャーバンド-2σを下回っており、反発確認が必要です"
+      );
+    }
+  }
+
+
+  // -------------------------------------
+  // サポート
+  // -------------------------------------
+
+  if (
+    supportPrice !== null &&
+    supportDistancePercent !== null
+  ) {
+
+    if (
+      supportDistancePercent <= 2
+    ) {
+
+      entryScore += 18;
+
+      entryReasons.push(
+        `現在値の約${supportDistancePercent.toFixed(1)}%下に直近サポートがあります`
+      );
+
+    } else if (
+      supportDistancePercent <= 4
+    ) {
+
+      entryScore += 12;
+
+      entryReasons.push(
+        `現在値の約${supportDistancePercent.toFixed(1)}%下にサポートがあります`
+      );
+
+    } else if (
+      supportDistancePercent <= 7
+    ) {
+
+      entryScore += 6;
+
+      entryReasons.push(
+        "比較的近い位置にサポートがあります"
+      );
+
+    } else {
+
+      entryScore -= 5;
+
+      entryCautions.push(
+        "直近サポートまで距離があり、下値余地に注意が必要です"
+      );
+    }
+
+
+    if (
+      Number.isFinite(
+        nearestSupport?.touches
+      ) &&
+      nearestSupport.touches >= 3
+    ) {
+
+      entryScore += 5;
+
+      entryReasons.push(
+        "直近サポート付近で複数回の価格反応があります"
+      );
+    }
+  }
+
+
+  // -------------------------------------
+  // レジスタンス
+  // -------------------------------------
+
+  if (
+    resistancePrice !== null &&
+    resistanceDistancePercent !== null
+  ) {
+
+    if (
+      resistanceDistancePercent <= 1.5
+    ) {
+
+      entryScore -= 20;
+
+      entryCautions.push(
+        "現在値のすぐ上にレジスタンスがあります"
+      );
+
+    } else if (
+      resistanceDistancePercent <= 3
+    ) {
+
+      entryScore -= 10;
+
+      entryCautions.push(
+        "現在値の近くに上値抵抗があります"
+      );
+
+    } else if (
+      resistanceDistancePercent <= 5
+    ) {
+
+      entryScore -= 3;
+
+      entryCautions.push(
+        "比較的近い位置にレジスタンスがあります"
+      );
+
+    } else {
+
+      entryScore += 8;
+
+      entryReasons.push(
+        "直近レジスタンスまで一定の上値余地があります"
+      );
+    }
+  }
+
+
+  // -------------------------------------
+  // トレンド・MACD
+  // -------------------------------------
+
+  if (bullishTrend) {
+
+    entryScore += 8;
+
+    entryReasons.push(
+      "短期上昇トレンドが維持されています"
+    );
+  }
+
+
+  if (macdBullish) {
+
+    entryScore += 5;
+
+    entryReasons.push(
+      "MACDはエントリー方向を支えています"
+    );
+  }
+
+
+  // =====================================
+  // 11. 現在値と買い候補ゾーンの位置関係
+  // =====================================
+
+  const aboveEntryHighPercent =
+    entryHigh > 0
+      ? (
+          (
+            latestClose -
+            entryHigh
+          ) /
+          entryHigh
+        ) *
+        100
+      : null;
+
+
+  const belowEntryLowPercent =
+    entryLow > 0
+      ? (
+          (
+            entryLow -
+            latestClose
+          ) /
+          entryLow
+        ) *
+        100
+      : null;
+
+
+  if (
+    latestClose >= entryLow &&
+    latestClose <= entryHigh
+  ) {
+
+    entryScore += 18;
+
+    entryReasons.push(
+      "現在値が買い候補ゾーン内にあります"
+    );
+
+  } else if (
+    Number.isFinite(
+      aboveEntryHighPercent
+    ) &&
+    aboveEntryHighPercent > 0
+  ) {
+
+    if (
+      aboveEntryHighPercent <= 1
+    ) {
+
+      entryScore += 8;
+
+      entryReasons.push(
+        "現在値は買い候補上限の1%以内です"
+      );
+
+    } else if (
+      aboveEntryHighPercent <= 3
+    ) {
+
+      entryCautions.push(
+        `現在値は買い候補上限より約${aboveEntryHighPercent.toFixed(1)}%上にあります`
+      );
+
+    } else if (
+      aboveEntryHighPercent <= 5
+    ) {
+
+      entryScore -= 10;
+
+      entryCautions.push(
+        `現在値は買い候補上限より約${aboveEntryHighPercent.toFixed(1)}%高く、追い買いリスクがあります`
+      );
+
+    } else {
+
+      entryScore -= 20;
+
+      entryCautions.push(
+        `現在値は買い候補上限より約${aboveEntryHighPercent.toFixed(1)}%高く、追いかける位置ではありません`
+      );
+    }
+
+  } else if (
+    Number.isFinite(
+      belowEntryLowPercent
+    ) &&
+    belowEntryLowPercent > 0
+  ) {
+
+    if (
+      belowEntryLowPercent <= 1
+    ) {
+
+      entryScore += 5;
+
+      entryReasons.push(
+        "現在値は買い候補下限のすぐ下にあります"
+      );
+
+    } else {
+
+      entryScore -= 8;
+
+      entryCautions.push(
+        "現在値が買い候補を下抜けており、反発確認が必要です"
+      );
+    }
+  }
+
+
+  // =====================================
+  // 12. 現在値からの実戦RR評価
+  // =====================================
+
+  if (
+    Number.isFinite(
+      currentRiskReward1
+    )
+  ) {
+
+    if (
+      currentRiskReward1 >= 2.5
+    ) {
+
+      entryScore += 15;
+
+      entryReasons.push(
+        `現在値から利確①までのリスクリワードは1：${currentRiskReward1.toFixed(2)}で良好です`
+      );
+
+    } else if (
+      currentRiskReward1 >= 2
+    ) {
+
+      entryScore += 10;
+
+      entryReasons.push(
+        `現在値から利確①までのリスクリワードは1：${currentRiskReward1.toFixed(2)}です`
+      );
+
+    } else if (
+      currentRiskReward1 >= 1.5
+    ) {
+
+      entryScore += 5;
+
+      entryReasons.push(
+        `現在値から利確①までのリスクリワードは1：${currentRiskReward1.toFixed(2)}です`
+      );
+
+    } else if (
+      currentRiskReward1 >= 1.2
+    ) {
+
+      entryCautions.push(
+        `現在値から利確①までのリスクリワードは1：${currentRiskReward1.toFixed(2)}で、余裕は大きくありません`
+      );
+
+    } else if (
+      currentRiskReward1 >= 1
+    ) {
+
+      entryScore -= 5;
+
+      entryCautions.push(
+        `現在値から利確①までのリスクリワードは1：${currentRiskReward1.toFixed(2)}です`
+      );
+
+    } else if (
+      currentRiskReward1 >= 0.7
+    ) {
+
+      entryScore -= 10;
+
+      entryCautions.push(
+        `現在値から利確①までのリスクリワードは1：${currentRiskReward1.toFixed(2)}で不利です`
+      );
+
+    } else {
+
+      entryScore -= 18;
+
+      entryCautions.push(
+        `現在値から利確①までのリスクリワードは1：${currentRiskReward1.toFixed(2)}で、追い買いには不利です`
+      );
+    }
+  }
+
+
+  // =====================================
+  // 13. エントリー点数確定
+  // =====================================
+
+  entryScore =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        Math.round(entryScore)
+      )
+    );
+
+
+  // =====================================
+  // 14. 総合スコア
+  // =====================================
+
+  const score =
+    Math.round(
+      trendScore * 0.6 +
+      entryScore * 0.4
+    );
+
+
+  // =====================================
+  // 15. リスク管理
   // =====================================
 
   const loss100Short =
@@ -842,7 +1106,6 @@ export function createStrategy({
     100;
 
 
-  // 100株建てた場合の建玉金額
   const minimumLotTradeValue =
     entryCenter *
     100;
@@ -880,7 +1143,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 12. 100株でリスク基準を守る条件
+  // 16. 100株でリスク基準を守る条件
   // =====================================
 
   const requiredCapitalFor100 =
@@ -932,15 +1195,13 @@ export function createStrategy({
 
 
   // =====================================
-  // 13. 現物 / 信用の必要資金
+  // 17. 現物 / 信用の必要資金
   // =====================================
 
-  // 現物なら建玉金額そのものが必要
   const requiredCashFor100 =
     minimumLotTradeValue;
 
 
-  // 信用なら入力した保証金率で概算
   const requiredMarginFor100 =
     minimumLotTradeValue *
     (
@@ -983,7 +1244,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 14. 判定ラベル
+  // 18. 判定ラベル
   // =====================================
 
   let label;
@@ -1014,7 +1275,7 @@ export function createStrategy({
 
   } else if (
     trendScore >= 70 &&
-    entryScore >= 70
+    entryScore >= 75
   ) {
 
     label =
@@ -1025,11 +1286,22 @@ export function createStrategy({
 
   } else if (
     trendScore >= 70 &&
-    entryScore < 70
+    entryScore >= 60
   ) {
 
     label =
-      "強いが待ち";
+      "強い・エントリー待ち";
+
+    className =
+      "wait";
+
+  } else if (
+    trendScore >= 70 &&
+    entryScore < 60
+  ) {
+
+    label =
+      "強いが今は待ち";
 
     className =
       "wait";
@@ -1056,7 +1328,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 15. AIコメント
+  // 19. AIコメント
   // =====================================
 
   const roundedEntryLow =
@@ -1092,21 +1364,30 @@ export function createStrategy({
 
   if (
     trendScore >= 75 &&
-    entryScore < 60
+    entryScore < 50
   ) {
 
     action =
-      `トレンド自体は強い一方、現在位置からのエントリー条件はまだ良くありません。` +
+      `トレンド自体は強いですが、現在値からのエントリー条件は良くありません。` +
       `${roundedEntryLow.toLocaleString("ja-JP")}～${roundedEntryHigh.toLocaleString("ja-JP")}円付近までの押し、または反発確認を待つ判断です。`;
 
   } else if (
     trendScore >= 70 &&
-    entryScore >= 70
+    entryScore >= 75
   ) {
 
     action =
-      `トレンドとエントリー条件の両方が比較的良好です。` +
+      `トレンドと現在のエントリー条件の両方が良好です。` +
       `${roundedEntryLow.toLocaleString("ja-JP")}～${roundedEntryHigh.toLocaleString("ja-JP")}円付近を分割エントリー候補とします。`;
+
+  } else if (
+    trendScore >= 70 &&
+    entryScore >= 60
+  ) {
+
+    action =
+      `トレンドは良好ですが、現在値から飛びつくより買い候補への接近を待ちたい局面です。` +
+      `${roundedEntryLow.toLocaleString("ja-JP")}～${roundedEntryHigh.toLocaleString("ja-JP")}円付近での値動きを確認します。`;
 
   } else if (
     bullishTrend &&
@@ -1128,8 +1409,19 @@ export function createStrategy({
   } else {
 
     action =
-      `方向感が十分に揃っていません。` +
+      `方向感とエントリー条件が十分に揃っていません。` +
       `${roundedEntryLow.toLocaleString("ja-JP")}～${roundedEntryHigh.toLocaleString("ja-JP")}円付近を候補とし、反発確認を優先します。`;
+  }
+
+
+  if (
+    Number.isFinite(
+      currentRiskReward1
+    )
+  ) {
+
+    action +=
+      ` 現在値から利確目安①までのリスクリワードは約1：${currentRiskReward1.toFixed(2)}です。`;
   }
 
 
@@ -1154,7 +1446,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 16. 理由・注意点
+  // 20. 理由・注意点
   // =====================================
 
   const reasons = [
@@ -1182,7 +1474,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 17. 戻り値
+  // 21. 戻り値
   // =====================================
 
   return {
@@ -1225,6 +1517,16 @@ export function createStrategy({
     riskReward1,
     riskReward2,
 
+    currentRiskReward1,
+    currentRiskReward2,
+
+    currentRiskPerShare,
+    currentReward1PerShare,
+    currentReward2PerShare,
+
+    aboveEntryHighPercent,
+    belowEntryLowPercent,
+
     shortRiskPerShare,
     swingRiskPerShare,
 
@@ -1236,10 +1538,8 @@ export function createStrategy({
     recommendedShares,
     requiredCapital,
 
-    // 建玉
     minimumLotTradeValue,
 
-    // リスク
     requiredCapitalFor100,
     maxRiskPerShareFor100,
     maxAllowedStopFor100,
@@ -1247,7 +1547,6 @@ export function createStrategy({
     minimumLotCapitalRiskPercent,
     canTradeMinimumLot,
 
-    // 取引方式
     tradeMode:
       safeTradeMode,
 
