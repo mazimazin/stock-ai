@@ -12,8 +12,7 @@ import {
   detectMovingAverageCross,
   calculateRSI,
   calculateATR,
-  calculateMACD,
-  getLastFinite
+  calculateMACD
 } from "./indicators.js";
 
 import {
@@ -40,17 +39,12 @@ import {
 
 export default {
 
-  async fetch(
-    request,
-    env
-  ) {
+  async fetch(request, env) {
 
     try {
 
       const url =
-        new URL(
-          request.url
-        );
+        new URL(request.url);
 
 
       // =====================================
@@ -58,15 +52,12 @@ export default {
       // =====================================
 
       if (
-        url.searchParams.get(
-          "mode"
-        ) === "ranking"
+        url.searchParams.get("mode") ===
+        "ranking"
       ) {
 
         const rankingType =
-          url.searchParams.get(
-            "type"
-          ) ||
+          url.searchParams.get("type") ||
           "overall";
 
 
@@ -98,9 +89,7 @@ export default {
 
       const inputCode =
         (
-          url.searchParams.get(
-            "code"
-          ) ||
+          url.searchParams.get("code") ||
           "285A"
         )
           .trim()
@@ -109,31 +98,21 @@ export default {
 
       const capital =
         normalizeNumber(
-          url.searchParams.get(
-            "capital"
-          ),
+          url.searchParams.get("capital"),
           1000000
         );
 
 
       const riskPercent =
         normalizeNumber(
-          url.searchParams.get(
-            "risk"
-          ),
+          url.searchParams.get("risk"),
           1
         );
 
 
-      // =====================================
-      // 現物 / 信用
-      // =====================================
-
       const rawTradeMode =
         (
-          url.searchParams.get(
-            "trade"
-          ) ||
+          url.searchParams.get("trade") ||
           "margin"
         )
           .trim()
@@ -148,15 +127,13 @@ export default {
 
       const marginRate =
         normalizeNumber(
-          url.searchParams.get(
-            "margin"
-          ),
+          url.searchParams.get("margin"),
           30
         );
 
 
       // =====================================
-      // J-Quantsコード
+      // コード
       // =====================================
 
       const apiCode =
@@ -166,14 +143,12 @@ export default {
 
 
       const stockName =
-        STOCK_NAMES[
-          inputCode
-        ] ||
+        STOCK_NAMES[inputCode] ||
         inputCode;
 
 
       // =====================================
-      // データ取得
+      // 株価取得
       // =====================================
 
       const prices =
@@ -183,16 +158,18 @@ export default {
         );
 
 
-      if (
-        !Array.isArray(
-          prices
-        ) ||
-        prices.length < 2
-      ) {
+      if (!Array.isArray(prices)) {
 
-        return htmlError(
-          "株価データが不足しています。",
-          500
+        throw new Error(
+          "STEP 1 株価取得：prices が配列ではありません"
+        );
+      }
+
+
+      if (prices.length < 2) {
+
+        throw new Error(
+          "STEP 1 株価取得：株価データが不足しています"
         );
       }
 
@@ -258,17 +235,15 @@ export default {
 
 
       const latestClose =
-        Number(
-          latest.AdjC ??
-          latest.C
-        );
+        closes[
+          closes.length - 1
+        ];
 
 
       const previousClose =
-        Number(
-          previous.AdjC ??
-          previous.C
-        );
+        closes[
+          closes.length - 2
+        ];
 
 
       const change =
@@ -281,8 +256,7 @@ export default {
           ? (
               change /
               previousClose
-            ) *
-            100
+            ) * 100
           : null;
 
 
@@ -290,97 +264,123 @@ export default {
       // 移動平均
       // =====================================
 
-      const ma5 =
-        calculateSMA(
-          closes,
-          5
+      let ma5;
+      let ma25;
+      let ma75;
+      let ma200;
+
+
+      try {
+
+        ma5 =
+          calculateSMA(
+            closes,
+            5
+          );
+
+        ma25 =
+          calculateSMA(
+            closes,
+            25
+          );
+
+        ma75 =
+          calculateSMA(
+            closes,
+            75
+          );
+
+        ma200 =
+          calculateSMA(
+            closes,
+            200
+          );
+
+      } catch (error) {
+
+        throw new Error(
+          `STEP 2 移動平均：${error.message}`
         );
-
-
-      const ma25 =
-        calculateSMA(
-          closes,
-          25
-        );
-
-
-      const ma75 =
-        calculateSMA(
-          closes,
-          75
-        );
-
-
-      const ma200 =
-        calculateSMA(
-          closes,
-          200
-        );
+      }
 
 
       // =====================================
       // RSI
       // =====================================
 
-      const rsi14 =
-        calculateRSI(
-          closes,
-          14
+      let rsi14;
+
+
+      try {
+
+        rsi14 =
+          calculateRSI(
+            closes,
+            14
+          );
+
+      } catch (error) {
+
+        throw new Error(
+          `STEP 3 RSI：${error.message}`
         );
+      }
 
 
       // =====================================
-      // ボリンジャーバンド
+      // ボリンジャー
       // =====================================
 
-      const bollinger =
-        calculateBollingerBands(
-          closes,
-          20,
-          2
+      let bollinger;
+
+
+      try {
+
+        bollinger =
+          calculateBollingerBands(
+            closes,
+            20,
+            2
+          );
+
+      } catch (error) {
+
+        throw new Error(
+          `STEP 4 ボリンジャー：${error.message}`
         );
+      }
 
 
       // =====================================
       // 出来高
       // =====================================
 
-      const recent20Volumes =
-        volumes
-          .slice(
-            -20
-          )
-          .filter(
-            Number.isFinite
+      let averageVolume20;
+
+
+      try {
+
+        averageVolume20 =
+          calculateSMA(
+            volumes,
+            20
           );
 
+      } catch (error) {
 
-      const averageVolume20 =
-        recent20Volumes.length > 0
-          ? recent20Volumes.reduce(
-              (
-                sum,
-                value
-              ) =>
-                sum +
-                value,
-              0
-            ) /
-            recent20Volumes.length
-          : null;
+        throw new Error(
+          `STEP 5 出来高平均：${error.message}`
+        );
+      }
 
 
       const latestVolume =
-        Number(
-          latest.AdjVo ??
-          latest.Vo
-        );
+        volumes[
+          volumes.length - 1
+        ];
 
 
       const volumeRatio =
-        Number.isFinite(
-          latestVolume
-        ) &&
         Number.isFinite(
           averageVolume20
         ) &&
@@ -394,55 +394,143 @@ export default {
       // クロス
       // =====================================
 
-      const crossSignal =
-        detectMovingAverageCross(
-          closes,
-          5,
-          25
+      let crossSignal;
+
+
+      try {
+
+        crossSignal =
+          detectMovingAverageCross(
+            closes,
+            5,
+            25
+          );
+
+      } catch (error) {
+
+        throw new Error(
+          `STEP 6 クロス：${error.message}`
         );
+      }
 
 
       // =====================================
       // ATR
       // =====================================
 
-      const atr14 =
-        calculateATR(
-          highs,
-          lows,
-          closes,
-          14
+      let atr14;
+
+
+      try {
+
+        atr14 =
+          calculateATR(
+            highs,
+            lows,
+            closes,
+            14
+          );
+
+      } catch (error) {
+
+        throw new Error(
+          `STEP 7 ATR：${error.message}`
         );
+      }
 
 
       // =====================================
       // MACD
       // =====================================
 
-      const macdData =
-        calculateMACD(
-          closes,
-          12,
-          26,
-          9
+      let macdData;
+
+
+      try {
+
+        macdData =
+          calculateMACD(
+            closes,
+            12,
+            26,
+            9
+          );
+
+      } catch (error) {
+
+        throw new Error(
+          `STEP 8 MACD計算：${error.message}`
         );
+      }
+
+
+      if (
+        !macdData ||
+        typeof macdData !== "object"
+      ) {
+
+        throw new Error(
+          "STEP 8 MACD計算：戻り値がありません"
+        );
+      }
+
+
+      /*
+       * indicators.js の実装差があっても
+       * 対応できるように候補名を吸収する
+       */
+
+      const macdArray =
+        Array.isArray(
+          macdData.macd
+        )
+          ? macdData.macd
+          : Array.isArray(
+              macdData.macdLine
+            )
+            ? macdData.macdLine
+            : [];
+
+
+      const signalArray =
+        Array.isArray(
+          macdData.signal
+        )
+          ? macdData.signal
+          : Array.isArray(
+              macdData.signalLine
+            )
+            ? macdData.signalLine
+            : [];
+
+
+      const histogramArray =
+        Array.isArray(
+          macdData.histogram
+        )
+          ? macdData.histogram
+          : Array.isArray(
+              macdData.hist
+            )
+            ? macdData.hist
+            : [];
 
 
       const latestMacd =
-        getLastFinite(
-          macdData.macd
+        getLastFiniteSafe(
+          macdArray
         );
 
 
       const latestSignal =
-        getLastFinite(
-          macdData.signal
+        getLastFiniteSafe(
+          signalArray
         );
 
 
       const latestHistogram =
-        getLastFinite(
-          macdData.histogram
+        getLastFiniteSafe(
+          histogramArray
         );
 
 
@@ -450,69 +538,97 @@ export default {
       // 20日高値
       // =====================================
 
+      const recentHighs =
+        highs
+          .slice(-20)
+          .filter(
+            Number.isFinite
+          );
+
+
       const recent20High =
-        Math.max(
-          ...highs
-            .slice(
-              -20
+        recentHighs.length > 0
+          ? Math.max(
+              ...recentHighs
             )
-            .filter(
-              Number.isFinite
-            )
-        );
+          : null;
 
 
       // =====================================
       // サポート / レジスタンス
       // =====================================
 
-      const supportResistance =
-        detectSupportResistance(
-          prices,
-          latestClose
+      let supportResistance;
+
+
+      try {
+
+        supportResistance =
+          detectSupportResistance(
+            prices,
+            latestClose
+          );
+
+      } catch (error) {
+
+        throw new Error(
+          `STEP 9 サポート・レジスタンス：${error.message}`
         );
+      }
 
 
       // =====================================
       // 戦略
       // =====================================
 
-      const strategy =
-        createStrategy({
+      let strategy;
 
-          latestClose,
 
-          ma5,
-          ma25,
-          ma75,
-          ma200,
+      try {
 
-          rsi14,
+        strategy =
+          createStrategy({
 
-          bollinger,
+            latestClose,
 
-          volumeRatio,
+            ma5,
+            ma25,
+            ma75,
+            ma200,
 
-          crossSignal,
+            rsi14,
 
-          atr14,
+            bollinger,
 
-          latestMacd,
-          latestSignal,
-          latestHistogram,
+            volumeRatio,
 
-          recent20High,
+            crossSignal,
 
-          supportResistance,
+            atr14,
 
-          capital,
+            latestMacd,
+            latestSignal,
+            latestHistogram,
 
-          riskPercent,
+            recent20High,
 
-          tradeMode,
+            supportResistance,
 
-          marginRate
-        });
+            capital,
+
+            riskPercent,
+
+            tradeMode,
+
+            marginRate
+          });
+
+      } catch (error) {
+
+        throw new Error(
+          `STEP 10 戦略：${error.message}`
+        );
+      }
 
 
       // =====================================
@@ -526,104 +642,98 @@ export default {
         );
 
 
+      const chartPrices =
+        prices.slice(
+          chartStart
+        );
+
+
       const chartData =
-        prices
-          .slice(
-            chartStart
-          )
-          .map(
-            (
-              price,
-              chartIndex
-            ) => {
+        chartPrices.map(
+          (
+            price,
+            index
+          ) => {
 
-              const actualIndex =
-                chartStart +
-                chartIndex;
+            const absoluteIndex =
+              chartStart +
+              index;
 
 
-              return {
+            return {
 
-                date:
-                  price.Date,
+              date:
+                price.Date,
 
-                open:
-                  Number(
-                    price.AdjO ??
-                    price.O
-                  ),
+              open:
+                Number(
+                  price.AdjO ??
+                  price.O
+                ),
 
-                close:
-                  Number(
-                    price.AdjC ??
-                    price.C
-                  ),
+              close:
+                closes[
+                  absoluteIndex
+                ],
 
-                volume:
-                  Number(
-                    price.AdjVo ??
-                    price.Vo
-                  ),
+              volume:
+                volumes[
+                  absoluteIndex
+                ],
 
-                ma5:
-                  calculateSMAAt(
-                    closes,
-                    actualIndex,
-                    5
-                  ),
+              ma5:
+                calculateSMAAtSafe(
+                  closes,
+                  absoluteIndex,
+                  5
+                ),
 
-                ma25:
-                  calculateSMAAt(
-                    closes,
-                    actualIndex,
-                    25
-                  ),
+              ma25:
+                calculateSMAAtSafe(
+                  closes,
+                  absoluteIndex,
+                  25
+                ),
 
-                ma75:
-                  calculateSMAAt(
-                    closes,
-                    actualIndex,
-                    75
-                  ),
+              ma75:
+                calculateSMAAtSafe(
+                  closes,
+                  absoluteIndex,
+                  75
+                ),
 
-                ma200:
-                  calculateSMAAt(
-                    closes,
-                    actualIndex,
-                    200
-                  ),
+              ma200:
+                calculateSMAAtSafe(
+                  closes,
+                  absoluteIndex,
+                  200
+                ),
 
-                bollinger:
-                  calculateBollingerAt(
-                    closes,
-                    actualIndex,
-                    20,
-                    2
-                  ),
+              bollinger:
+                calculateBollingerAtSafe(
+                  closes,
+                  absoluteIndex,
+                  20,
+                  2
+                ),
 
-                macd:
-                  macdData
-                    .macd?.[
-                      actualIndex
-                    ] ??
-                  null,
+              macd:
+                macdArray[
+                  absoluteIndex
+                ] ?? null,
 
-                signal:
-                  macdData
-                    .signal?.[
-                      actualIndex
-                    ] ??
-                  null,
+              signal:
+                signalArray[
+                  absoluteIndex
+                ] ?? null,
 
-                histogram:
-                  macdData
-                    .histogram?.[
-                      actualIndex
-                    ] ??
-                  null
-              };
-            }
-          );
+              histogram:
+                histogramArray[
+                  absoluteIndex
+                ] ?? null
+            };
+          }
+        );
 
 
       // =====================================
@@ -631,12 +741,8 @@ export default {
       // =====================================
 
       const recentPrices =
-        [
-          ...prices
-        ]
-          .slice(
-            -10
-          )
+        prices
+          .slice(-10)
           .reverse();
 
 
@@ -644,60 +750,74 @@ export default {
       // HTML
       // =====================================
 
-      const html =
-        createHtml({
+      let html;
 
-          stockName,
 
-          inputCode,
+      try {
 
-          latest,
+        html =
+          createHtml({
 
-          latestClose,
+            stockName,
 
-          previousClose,
+            inputCode,
 
-          change,
+            latest,
 
-          changePercent,
+            latestClose,
 
-          recentPrices,
+            previousClose,
 
-          ma5,
-          ma25,
-          ma75,
-          ma200,
+            change,
 
-          rsi14,
+            changePercent,
 
-          bollinger,
+            recentPrices,
 
-          averageVolume20,
+            ma5,
+            ma25,
+            ma75,
+            ma200,
 
-          volumeRatio,
+            rsi14,
 
-          crossSignal,
+            bollinger,
 
-          atr14,
+            averageVolume20,
 
-          latestMacd,
-          latestSignal,
-          latestHistogram,
+            volumeRatio,
 
-          strategy,
+            crossSignal,
 
-          supportResistance,
+            atr14,
 
-          chartData,
+            latestMacd,
 
-          capital,
+            latestSignal,
 
-          riskPercent,
+            latestHistogram,
 
-          tradeMode,
+            strategy,
 
-          marginRate
-        });
+            supportResistance,
+
+            chartData,
+
+            capital,
+
+            riskPercent,
+
+            tradeMode,
+
+            marginRate
+          });
+
+      } catch (error) {
+
+        throw new Error(
+          `STEP 11 HTML：${error.message}`
+        );
+      }
 
 
       return new Response(
@@ -705,10 +825,10 @@ export default {
         {
           headers: {
 
-            "content-type":
+            "Content-Type":
               "text/html; charset=UTF-8",
 
-            "cache-control":
+            "Cache-Control":
               "no-store"
           }
         }
@@ -732,25 +852,73 @@ export default {
 
 
 // =====================================
-// 指定位置SMA
+// 最後の有限値
 // =====================================
 
-function calculateSMAAt(
-  values,
-  index,
-  period
+function getLastFiniteSafe(
+  values
 ) {
 
   if (
-    index <
-    period - 1
+    !Array.isArray(values)
   ) {
 
     return null;
   }
 
 
-  const section =
+  for (
+    let i =
+      values.length - 1;
+
+    i >= 0;
+
+    i--
+  ) {
+
+    if (
+      Number.isFinite(
+        values[i]
+      )
+    ) {
+
+      return values[i];
+    }
+  }
+
+
+  return null;
+}
+
+
+// =====================================
+// 指定位置 SMA
+// =====================================
+
+function calculateSMAAtSafe(
+  values,
+  index,
+  period
+) {
+
+  if (
+    !Array.isArray(values)
+  ) {
+
+    return null;
+  }
+
+
+  if (
+    index + 1 <
+    period
+  ) {
+
+    return null;
+  }
+
+
+  const selected =
     values.slice(
       index -
         period +
@@ -761,7 +929,16 @@ function calculateSMAAt(
 
 
   if (
-    section.some(
+    selected.length !==
+    period
+  ) {
+
+    return null;
+  }
+
+
+  if (
+    selected.some(
       (value) =>
         !Number.isFinite(
           value
@@ -773,16 +950,77 @@ function calculateSMAAt(
   }
 
 
-  return section.reduce(
-    (
-      sum,
-      value
-    ) =>
-      sum +
-      value,
-    0
-  ) /
-  period;
+  return (
+    selected.reduce(
+      (
+        sum,
+        value
+      ) =>
+        sum +
+        value,
+      0
+    ) /
+    period
+  );
+}
+
+
+// =====================================
+// 標準偏差
+// =====================================
+
+function standardDeviationSafe(
+  values
+) {
+
+  if (
+    !Array.isArray(values) ||
+    values.length === 0
+  ) {
+
+    return null;
+  }
+
+
+  const average =
+    values.reduce(
+      (
+        sum,
+        value
+      ) =>
+        sum +
+        value,
+      0
+    ) /
+    values.length;
+
+
+  const variance =
+    values.reduce(
+      (
+        sum,
+        value
+      ) => {
+
+        const diff =
+          value -
+          average;
+
+
+        return (
+          sum +
+          diff *
+          diff
+        );
+      },
+      0
+    ) /
+    values.length;
+
+
+  return Math.sqrt(
+    variance
+  );
 }
 
 
@@ -790,7 +1028,7 @@ function calculateSMAAt(
 // 指定位置ボリンジャー
 // =====================================
 
-function calculateBollingerAt(
+function calculateBollingerAtSafe(
   values,
   index,
   period = 20,
@@ -798,19 +1036,31 @@ function calculateBollingerAt(
 ) {
 
   if (
-    index <
-    period - 1
+    !Array.isArray(values)
   ) {
 
     return {
-      upper: null,
       middle: null,
+      upper: null,
       lower: null
     };
   }
 
 
-  const section =
+  if (
+    index + 1 <
+    period
+  ) {
+
+    return {
+      middle: null,
+      upper: null,
+      lower: null
+    };
+  }
+
+
+  const selected =
     values.slice(
       index -
         period +
@@ -821,7 +1071,9 @@ function calculateBollingerAt(
 
 
   if (
-    section.some(
+    selected.length !==
+    period ||
+    selected.some(
       (value) =>
         !Number.isFinite(
           value
@@ -830,15 +1082,15 @@ function calculateBollingerAt(
   ) {
 
     return {
-      upper: null,
       middle: null,
+      upper: null,
       lower: null
     };
   }
 
 
   const middle =
-    section.reduce(
+    selected.reduce(
       (
         sum,
         value
@@ -850,45 +1102,38 @@ function calculateBollingerAt(
     period;
 
 
-  const variance =
-    section.reduce(
-      (
-        sum,
-        value
-      ) => {
-
-        const diff =
-          value -
-          middle;
-
-
-        return sum +
-          diff *
-          diff;
-      },
-      0
-    ) /
-    period;
-
-
-  const standardDeviation =
-    Math.sqrt(
-      variance
+  const deviation =
+    standardDeviationSafe(
+      selected
     );
+
+
+  if (
+    !Number.isFinite(
+      deviation
+    )
+  ) {
+
+    return {
+      middle,
+      upper: null,
+      lower: null
+    };
+  }
 
 
   return {
 
+    middle,
+
     upper:
       middle +
-      standardDeviation *
+      deviation *
       multiplier,
-
-    middle,
 
     lower:
       middle -
-      standardDeviation *
+      deviation *
       multiplier
   };
 }
