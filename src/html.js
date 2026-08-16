@@ -74,6 +74,14 @@ export function createHtml({
   // 100株リスク管理
   // =====================================
 
+  const minimumLotTradeValue =
+    Number.isFinite(
+      strategy.minimumLotTradeValue
+    )
+      ? strategy.minimumLotTradeValue
+      : null;
+
+
   const minimumLotLoss =
     Number.isFinite(
       strategy.loss100Short
@@ -105,15 +113,7 @@ export function createHtml({
       strategy.minimumLotRiskMultiple
     )
       ? strategy.minimumLotRiskMultiple
-      : (
-          minimumLotRiskExceeded &&
-          minimumLotLoss !== null &&
-          allowedLoss !== null &&
-          allowedLoss > 0
-            ? minimumLotLoss /
-              allowedLoss
-            : null
-        );
+      : null;
 
 
   const minimumLotCapitalRiskPercent =
@@ -121,16 +121,15 @@ export function createHtml({
       strategy.minimumLotCapitalRiskPercent
     )
       ? strategy.minimumLotCapitalRiskPercent
-      : (
-          minimumLotLoss !== null &&
-          Number.isFinite(capital) &&
-          capital > 0
-            ? (
-                minimumLotLoss /
-                capital
-              ) * 100
-            : null
-        );
+      : null;
+
+
+  const minimumLotCapitalMultiple =
+    Number.isFinite(
+      strategy.minimumLotCapitalMultiple
+    )
+      ? strategy.minimumLotCapitalMultiple
+      : null;
 
 
   const requiredCapitalFor100 =
@@ -1709,6 +1708,29 @@ export function createHtml({
                 <div class="risk-warning-box">
 
                   <div class="risk-warning-label">
+                    100株の売買金額
+                  </div>
+
+                  <div class="risk-warning-value">
+
+                    ${
+                      Number.isFinite(
+                        minimumLotTradeValue
+                      )
+                        ? `${formatNumber(
+                            minimumLotTradeValue
+                          )}円`
+                        : "-"
+                    }
+
+                  </div>
+
+                </div>
+
+
+                <div class="risk-warning-box">
+
+                  <div class="risk-warning-label">
                     100株の短期損失
                   </div>
 
@@ -1766,7 +1788,7 @@ export function createHtml({
                 <div class="risk-warning-box">
 
                   <div class="risk-warning-label">
-                    投資資金に対するリスク
+                    投資資金に対する損失率
                   </div>
 
                   <div class="risk-warning-value">
@@ -1786,13 +1808,36 @@ export function createHtml({
                 </div>
 
 
+                <div class="risk-warning-box">
+
+                  <div class="risk-warning-label">
+                    100株売買金額 ÷ 投資資金
+                  </div>
+
+                  <div class="risk-warning-value">
+
+                    ${
+                      Number.isFinite(
+                        minimumLotCapitalMultiple
+                      )
+                        ? `約${minimumLotCapitalMultiple.toFixed(
+                            1
+                          )}倍`
+                        : "-"
+                    }
+
+                  </div>
+
+                </div>
+
+
               </div>
 
 
               <div class="solution-box">
 
                 <div class="solution-title">
-                  100株で取引するなら必要な条件
+                  100株でリスク基準を守るための条件
                 </div>
 
 
@@ -1829,8 +1874,7 @@ export function createHtml({
 
                     <div class="solution-label">
 
-                      現在の資金で
-                      100株持つ場合の
+                      現在の資金で100株持つ場合の
                       1株あたり許容損失幅
 
                     </div>
@@ -1856,7 +1900,7 @@ export function createHtml({
 
                     <div class="solution-label">
 
-                      買い候補中心から計算した
+                      買い候補中心から逆算した
                       理論上の損切り上限
 
                     </div>
@@ -1886,10 +1930,10 @@ export function createHtml({
                   「理論上の損切り上限」は、
                   資金管理だけから逆算した価格です。
 
-                  実際のチャート上のサポートや
-                  ATRを無視して損切りを近づけると、
-                  通常の値動きだけで
-                  損切りされる可能性があります。
+                  チャート上のサポートやATRを無視して
+                  損切りを近づけると、
+                  通常の値動きだけで損切りされる
+                  可能性があります。
 
                   そのため、
                   チャート上の合理的な損切り位置と
@@ -1909,6 +1953,19 @@ export function createHtml({
 
 
       <div class="risk-grid">
+
+
+        ${strategyBox(
+          "100株の売買金額",
+          Number.isFinite(
+            strategy.minimumLotTradeValue
+          )
+            ? `${formatNumber(
+                strategy.minimumLotTradeValue
+              )}円`
+            : "-",
+          "position"
+        )}
 
 
         ${strategyBox(
@@ -1965,13 +2022,19 @@ export function createHtml({
         )}
 
 
-        ${strategyBox(
-          "必要資金の目安",
-          `${formatNumber(
+        ${
+          Number.isFinite(
             strategy.requiredCapital
-          )}円`,
-          "position"
-        )}
+          )
+            ? strategyBox(
+                "適正株数に必要な資金",
+                `${formatNumber(
+                  strategy.requiredCapital
+                )}円`,
+                "position"
+              )
+            : ""
+        }
 
 
       </div>
@@ -1987,6 +2050,11 @@ export function createHtml({
 
         日本株の100株単位に
         切り下げています。
+
+        適正株数が0株の場合は、
+        現在の損切り幅では
+        設定した許容損失内に
+        100株を収められないことを意味します。
 
       </div>
 
