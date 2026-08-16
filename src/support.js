@@ -47,7 +47,7 @@ export function detectSupportResistance(
 
 
   // =============================
-  // 1. 通常のピボット
+  // 1. 通常のピボット高値・安値
   // =============================
 
   for (
@@ -139,14 +139,13 @@ export function detectSupportResistance(
 
 
   // =============================
-  // 2. 直近高値・安値
+  // 2. 直近高値・安値を追加
   // =============================
 
   const recentStart =
     Math.max(
       startIndex,
-      closes.length -
-        recentWindow
+      closes.length - recentWindow
     );
 
   for (
@@ -177,21 +176,12 @@ export function detectSupportResistance(
 
 
   // =============================
-  // 3. 価格帯をクラスタ化
-  // =============================
-  //
-  // support / resistance を
-  // 先に分けないのがポイント。
-  //
-  // 同じ価格帯が重複する問題を防ぐ。
+  // 3. 近い価格帯をクラスタ化
   // =============================
 
   const tolerance =
     latestClose *
-    (
-      tolerancePercent /
-      100
-    );
+    (tolerancePercent / 100);
 
   const sortedCandidates =
     [...candidates].sort(
@@ -210,7 +200,7 @@ export function detectSupportResistance(
         (level) =>
           Math.abs(
             level.price -
-              candidate.price
+            candidate.price
           ) <= tolerance
       );
 
@@ -239,24 +229,17 @@ export function detectSupportResistance(
         candidate.source ===
         "recent"
       ) {
-        existing.recentTouches +=
-          1;
+        existing.recentTouches += 1;
       }
 
     } else {
       clusters.push({
-        price:
-          candidate.price,
-
-        touches:
-          1,
-
+        price: candidate.price,
+        touches: 1,
         recentTouches:
-          candidate.source ===
-          "recent"
+          candidate.source === "recent"
             ? 1
             : 0,
-
         lastIndex:
           candidate.index
       });
@@ -265,33 +248,29 @@ export function detectSupportResistance(
 
 
   // =============================
-  // 4. 現在値±15%だけ残す
+  // 4. 現在値から遠すぎる価格帯を除外
   // =============================
 
   const minimumPrice =
     latestClose *
     (
       1 -
-      maxDistancePercent /
-        100
+      maxDistancePercent / 100
     );
 
   const maximumPrice =
     latestClose *
     (
       1 +
-      maxDistancePercent /
-        100
+      maxDistancePercent / 100
     );
 
   const nearbyLevels =
     clusters
       .filter(
         (level) =>
-          level.price >=
-            minimumPrice &&
-          level.price <=
-            maximumPrice
+          level.price >= minimumPrice &&
+          level.price <= maximumPrice
       )
       .map(
         (level) => {
@@ -334,7 +313,7 @@ export function detectSupportResistance(
   // 5. サポート候補
   // =============================
 
-  const allSupports =
+  const supportCandidates =
     nearbyLevels
       .filter(
         (level) =>
@@ -342,23 +321,9 @@ export function detectSupportResistance(
           latestClose
       )
       .sort(
-        (a, b) => {
-          const scoreDiff =
-            b.strengthScore -
-            a.strengthScore;
-
-          if (
-            Math.abs(scoreDiff) >
-            1
-          ) {
-            return scoreDiff;
-          }
-
-          return (
-            b.price -
-            a.price
-          );
-        }
+        (a, b) =>
+          b.strengthScore -
+          a.strengthScore
       );
 
 
@@ -366,7 +331,7 @@ export function detectSupportResistance(
   // 6. レジスタンス候補
   // =============================
 
-  const allResistances =
+  const resistanceCandidates =
     nearbyLevels
       .filter(
         (level) =>
@@ -374,28 +339,14 @@ export function detectSupportResistance(
           latestClose
       )
       .sort(
-        (a, b) => {
-          const scoreDiff =
-            b.strengthScore -
-            a.strengthScore;
-
-          if (
-            Math.abs(scoreDiff) >
-            1
-          ) {
-            return scoreDiff;
-          }
-
-          return (
-            a.price -
-            b.price
-          );
-        }
+        (a, b) =>
+          b.strengthScore -
+          a.strengthScore
       );
 
 
   // =============================
-  // 7. 重複価格帯を除去
+  // 7. 念のため重複除去
   // =============================
 
   const removeDuplicates =
@@ -410,19 +361,11 @@ export function detectSupportResistance(
                 existing.price -
                 level.price
               ) <=
-              latestClose *
-                0.005
+              latestClose * 0.005
           );
 
         if (!duplicate) {
           result.push(level);
-        }
-
-        if (
-          result.length >=
-          maxLevels
-        ) {
-          break;
         }
       }
 
@@ -430,44 +373,56 @@ export function detectSupportResistance(
     };
 
 
+  // =============================
+  // 8. 最終結果は「現在値に近い順」
+  // =============================
+  //
+  // html.js が
+  // supports[0], supports[1], supports[2]
+  // の順番をそのまま表示できるようにする。
+  // =============================
+
   const supports =
     removeDuplicates(
-      allSupports
-    );
+      supportCandidates
+    )
+      .sort(
+        (a, b) =>
+          b.price - a.price
+      )
+      .slice(
+        0,
+        maxLevels
+      );
+
 
   const resistances =
     removeDuplicates(
-      allResistances
-    );
+      resistanceCandidates
+    )
+      .sort(
+        (a, b) =>
+          a.price - b.price
+      )
+      .slice(
+        0,
+        maxLevels
+      );
 
 
   // =============================
-  // 8. 現在値に一番近いライン
+  // 9. 直近サポート / レジスタンス
   // =============================
 
   const nearestSupport =
-    supports.length
-      ? [...supports]
-          .sort(
-            (a, b) =>
-              b.price -
-              a.price
-          )[0]
-      : null;
+    supports[0] ?? null;
 
   const nearestResistance =
-    resistances.length
-      ? [...resistances]
-          .sort(
-            (a, b) =>
-              a.price -
-              b.price
-          )[0]
-      : null;
+    resistances[0] ?? null;
 
 
   // =============================
-  // 9. 現在値との距離
+  // 10. 現在値との距離
   // =============================
 
   const supportDistancePercent =
@@ -480,6 +435,7 @@ export function detectSupportResistance(
           latestClose
         ) * 100
       : null;
+
 
   const resistanceDistancePercent =
     nearestResistance
