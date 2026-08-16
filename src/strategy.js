@@ -132,10 +132,6 @@ export function createStrategy({
   // =====================================
   // 3. トレンド評価
   // =====================================
-  //
-  // 「銘柄そのものが強いか」
-  // 0～100点
-  // =====================================
 
   let trendScore = 50;
 
@@ -143,14 +139,14 @@ export function createStrategy({
   const trendCautions = [];
 
 
-  // 株価と5日線
-
   if (
     Number.isFinite(ma5)
   ) {
+
     if (
       latestClose > ma5
     ) {
+
       trendScore += 10;
 
       trendReasons.push(
@@ -158,6 +154,7 @@ export function createStrategy({
       );
 
     } else {
+
       trendScore -= 10;
 
       trendCautions.push(
@@ -167,15 +164,15 @@ export function createStrategy({
   }
 
 
-  // 5日線と25日線
-
   if (
     Number.isFinite(ma5) &&
     Number.isFinite(ma25)
   ) {
+
     if (
       ma5 > ma25
     ) {
+
       trendScore += 15;
 
       trendReasons.push(
@@ -183,6 +180,7 @@ export function createStrategy({
       );
 
     } else {
+
       trendScore -= 15;
 
       trendCautions.push(
@@ -192,13 +190,15 @@ export function createStrategy({
   }
 
 
-  // 25日線と75日線
-
   if (
     Number.isFinite(ma25) &&
     Number.isFinite(ma75)
   ) {
-    if (mediumBullish) {
+
+    if (
+      mediumBullish
+    ) {
+
       trendScore += 10;
 
       trendReasons.push(
@@ -206,6 +206,7 @@ export function createStrategy({
       );
 
     } else {
+
       trendScore -= 10;
 
       trendCautions.push(
@@ -215,12 +216,14 @@ export function createStrategy({
   }
 
 
-  // 200日線
-
   if (
     Number.isFinite(ma200)
   ) {
-    if (longBullish) {
+
+    if (
+      longBullish
+    ) {
+
       trendScore += 5;
 
       trendReasons.push(
@@ -228,6 +231,7 @@ export function createStrategy({
       );
 
     } else {
+
       trendScore -= 5;
 
       trendCautions.push(
@@ -237,11 +241,10 @@ export function createStrategy({
   }
 
 
-  // ゴールデン / デッドクロス
-
   if (
     crossSignal === "golden"
   ) {
+
     trendScore += 8;
 
     trendReasons.push(
@@ -251,6 +254,7 @@ export function createStrategy({
   } else if (
     crossSignal === "dead"
   ) {
+
     trendScore -= 8;
 
     trendCautions.push(
@@ -259,13 +263,15 @@ export function createStrategy({
   }
 
 
-  // MACD
-
   if (
     Number.isFinite(latestMacd) &&
     Number.isFinite(latestSignal)
   ) {
-    if (macdBullish) {
+
+    if (
+      macdBullish
+    ) {
+
       trendScore += 10;
 
       trendReasons.push(
@@ -273,6 +279,7 @@ export function createStrategy({
       );
 
     } else {
+
       trendScore -= 10;
 
       trendCautions.push(
@@ -282,16 +289,16 @@ export function createStrategy({
   }
 
 
-  // MACDヒストグラム
-
   if (
     Number.isFinite(
       latestHistogram
     )
   ) {
+
     if (
       histogramPositive
     ) {
+
       trendScore += 5;
 
       trendReasons.push(
@@ -299,6 +306,7 @@ export function createStrategy({
       );
 
     } else {
+
       trendScore -= 3;
 
       trendCautions.push(
@@ -308,14 +316,14 @@ export function createStrategy({
   }
 
 
-  // 出来高
-
   if (
     Number.isFinite(volumeRatio)
   ) {
+
     if (
       volumeRatio >= 2
     ) {
+
       trendScore += 8;
 
       trendReasons.push(
@@ -325,6 +333,7 @@ export function createStrategy({
     } else if (
       volumeRatio >= 1.3
     ) {
+
       trendScore += 4;
 
       trendReasons.push(
@@ -334,6 +343,7 @@ export function createStrategy({
     } else if (
       volumeRatio < 0.7
     ) {
+
       trendScore -= 5;
 
       trendCautions.push(
@@ -348,17 +358,15 @@ export function createStrategy({
       0,
       Math.min(
         100,
-        Math.round(trendScore)
+        Math.round(
+          trendScore
+        )
       )
     );
 
 
   // =====================================
   // 4. エントリー評価
-  // =====================================
-  //
-  // 「今この価格から入りやすいか」
-  // 0～100点
   // =====================================
 
   let entryScore = 50;
@@ -367,14 +375,14 @@ export function createStrategy({
   const entryCautions = [];
 
 
-  // RSI
-
   if (
     Number.isFinite(rsi14)
   ) {
+
     if (
       rsi14 >= 80
     ) {
+
       entryScore -= 30;
 
       entryCautions.push(
@@ -384,6 +392,7 @@ export function createStrategy({
     } else if (
       rsi14 >= 70
     ) {
+
       entryScore -= 20;
 
       entryCautions.push(
@@ -394,6 +403,7 @@ export function createStrategy({
       rsi14 >= 45 &&
       rsi14 <= 65
     ) {
+
       entryScore += 10;
 
       entryReasons.push(
@@ -403,6 +413,7 @@ export function createStrategy({
     } else if (
       rsi14 <= 30
     ) {
+
       entryScore -= 5;
 
       entryCautions.push(
@@ -411,8 +422,6 @@ export function createStrategy({
     }
   }
 
-
-  // ボリンジャーバンド
 
   if (
     bollinger &&
@@ -423,10 +432,12 @@ export function createStrategy({
       bollinger.lower
     )
   ) {
+
     if (
       latestClose >
       bollinger.upper
     ) {
+
       entryScore -= 15;
 
       entryCautions.push(
@@ -437,6 +448,7 @@ export function createStrategy({
       latestClose <
       bollinger.lower
     ) {
+
       entryScore -= 5;
 
       entryCautions.push(
@@ -446,15 +458,15 @@ export function createStrategy({
   }
 
 
-  // サポートまでの距離
-
   if (
     supportPrice !== null &&
     supportDistancePercent !== null
   ) {
+
     if (
       supportDistancePercent <= 2
     ) {
+
       entryScore += 18;
 
       entryReasons.push(
@@ -464,6 +476,7 @@ export function createStrategy({
     } else if (
       supportDistancePercent <= 4
     ) {
+
       entryScore += 12;
 
       entryReasons.push(
@@ -473,6 +486,7 @@ export function createStrategy({
     } else if (
       supportDistancePercent <= 7
     ) {
+
       entryScore += 6;
 
       entryReasons.push(
@@ -480,6 +494,7 @@ export function createStrategy({
       );
 
     } else {
+
       entryScore -= 5;
 
       entryCautions.push(
@@ -494,6 +509,7 @@ export function createStrategy({
       ) &&
       nearestSupport.touches >= 3
     ) {
+
       entryScore += 5;
 
       entryReasons.push(
@@ -503,15 +519,15 @@ export function createStrategy({
   }
 
 
-  // レジスタンスまでの距離
-
   if (
     resistancePrice !== null &&
     resistanceDistancePercent !== null
   ) {
+
     if (
       resistanceDistancePercent <= 1.5
     ) {
+
       entryScore -= 20;
 
       entryCautions.push(
@@ -521,6 +537,7 @@ export function createStrategy({
     } else if (
       resistanceDistancePercent <= 3
     ) {
+
       entryScore -= 10;
 
       entryCautions.push(
@@ -530,6 +547,7 @@ export function createStrategy({
     } else if (
       resistanceDistancePercent <= 5
     ) {
+
       entryScore -= 3;
 
       entryCautions.push(
@@ -537,6 +555,7 @@ export function createStrategy({
       );
 
     } else {
+
       entryScore += 8;
 
       entryReasons.push(
@@ -546,11 +565,10 @@ export function createStrategy({
   }
 
 
-  // トレンドが強い場合は少し加点
-
   if (
     bullishTrend
   ) {
+
     entryScore += 8;
 
     entryReasons.push(
@@ -559,11 +577,10 @@ export function createStrategy({
   }
 
 
-  // MACDが上向きなら少し加点
-
   if (
     macdBullish
   ) {
+
     entryScore += 5;
   }
 
@@ -573,17 +590,15 @@ export function createStrategy({
       0,
       Math.min(
         100,
-        Math.round(entryScore)
+        Math.round(
+          entryScore
+        )
       )
     );
 
 
   // =====================================
   // 5. 総合スコア
-  // =====================================
-  //
-  // トレンド 60%
-  // エントリー 40%
   // =====================================
 
   const score =
@@ -606,17 +621,22 @@ export function createStrategy({
   let entryAnchor;
 
 
-  if (usableSupport) {
+  if (
+    usableSupport
+  ) {
+
     entryAnchor =
       supportPrice;
 
   } else if (
     Number.isFinite(ma5)
   ) {
+
     entryAnchor =
       ma5;
 
   } else {
+
     entryAnchor =
       latestClose -
       effectiveAtr;
@@ -627,7 +647,7 @@ export function createStrategy({
     Math.max(
       0,
       entryAnchor -
-        effectiveAtr * 0.15
+      effectiveAtr * 0.15
     );
 
 
@@ -635,7 +655,7 @@ export function createStrategy({
     Math.min(
       latestClose,
       entryAnchor +
-        effectiveAtr * 0.10
+      effectiveAtr * 0.10
     );
 
 
@@ -643,6 +663,7 @@ export function createStrategy({
     entryHigh <
     entryLow
   ) {
+
     entryHigh =
       entryLow;
   }
@@ -662,20 +683,24 @@ export function createStrategy({
   let shortStop;
 
 
-  if (usableSupport) {
+  if (
+    usableSupport
+  ) {
+
     shortStop =
       Math.max(
         0,
         supportPrice -
-          effectiveAtr * 0.35
+        effectiveAtr * 0.35
       );
 
   } else {
+
     shortStop =
       Math.max(
         0,
         entryLow -
-          effectiveAtr * 0.55
+        effectiveAtr * 0.55
       );
   }
 
@@ -693,29 +718,32 @@ export function createStrategy({
       secondSupport?.price
     )
   ) {
+
     swingStop =
       Math.max(
         0,
         secondSupport.price -
-          effectiveAtr * 0.30
+        effectiveAtr * 0.30
       );
 
   } else if (
     Number.isFinite(ma25)
   ) {
+
     swingStop =
       Math.max(
         0,
         ma25 -
-          effectiveAtr * 0.30
+        effectiveAtr * 0.30
       );
 
   } else {
+
     swingStop =
       Math.max(
         0,
         entryLow -
-          effectiveAtr * 1.5
+        effectiveAtr * 1.5
       );
   }
 
@@ -761,7 +789,7 @@ export function createStrategy({
   const minimumTarget1 =
     entryCenter +
     shortRiskPerShare *
-      1.2;
+    1.2;
 
 
   let target1;
@@ -770,14 +798,16 @@ export function createStrategy({
   if (
     resistancePrice !== null &&
     resistancePrice >
-      entryCenter &&
+    entryCenter &&
     resistancePrice >=
-      minimumTarget1
+    minimumTarget1
   ) {
+
     target1 =
       resistancePrice;
 
   } else {
+
     target1 =
       Math.max(
         Number.isFinite(
@@ -787,8 +817,8 @@ export function createStrategy({
           : 0,
 
         entryCenter +
-          shortRiskPerShare *
-            1.5
+        shortRiskPerShare *
+        1.5
       );
   }
 
@@ -800,11 +830,11 @@ export function createStrategy({
   const target2 =
     Math.max(
       target1 +
-        effectiveAtr * 0.8,
+      effectiveAtr * 0.8,
 
       entryCenter +
-        shortRiskPerShare *
-          2.5
+      shortRiskPerShare *
+      2.5
     );
 
 
@@ -842,10 +872,25 @@ export function createStrategy({
     100;
 
 
+  const safeCapital =
+    Number.isFinite(capital) &&
+    capital > 0
+      ? capital
+      : 0;
+
+
+  const safeRiskPercent =
+    Number.isFinite(riskPercent) &&
+    riskPercent > 0
+      ? riskPercent
+      : 1;
+
+
   const allowedLoss =
-    capital *
+    safeCapital *
     (
-      riskPercent / 100
+      safeRiskPercent /
+      100
     );
 
 
@@ -859,7 +904,8 @@ export function createStrategy({
               shortRiskPerShare
             ) /
             100
-          ) * 100
+          ) *
+          100
         )
       : 0;
 
@@ -870,7 +916,79 @@ export function createStrategy({
 
 
   // =====================================
-  // 13. 判定ラベル
+  // 13. 100株で取引するための必要条件
+  // =====================================
+
+  // 現在設定している許容損失率を守りながら
+  // 100株を現在の損切り幅で持つために
+  // 必要となる総資金
+
+  const requiredCapitalFor100 =
+    safeRiskPercent > 0
+      ? loss100Short /
+        (
+          safeRiskPercent /
+          100
+        )
+      : null;
+
+
+  // 現在の資金・許容損失率で
+  // 100株を保有する場合に許容できる
+  // 1株あたり最大損失幅
+
+  const maxRiskPerShareFor100 =
+    allowedLoss > 0
+      ? allowedLoss / 100
+      : 0;
+
+
+  // 買い候補中心価格から考えた
+  // 「100株でリスクルール内に収めるための」
+  // 理論上の損切り価格
+
+  const maxAllowedStopFor100 =
+    Math.max(
+      0,
+      entryCenter -
+      maxRiskPerShareFor100
+    );
+
+
+  // 100株時の損失が
+  // 許容損失の何倍か
+
+  const minimumLotRiskMultiple =
+    allowedLoss > 0
+      ? loss100Short /
+        allowedLoss
+      : null;
+
+
+  // 100株時の損失が
+  // 投資資金に対して何％か
+
+  const minimumLotCapitalRiskPercent =
+    safeCapital > 0
+      ? (
+          loss100Short /
+          safeCapital
+        ) *
+        100
+      : null;
+
+
+  // 100株が設定リスク内に
+  // 収まるかどうか
+
+  const canTradeMinimumLot =
+    allowedLoss > 0 &&
+    loss100Short <=
+    allowedLoss;
+
+
+  // =====================================
+  // 14. 判定ラベル
   // =====================================
 
   let label;
@@ -881,6 +999,7 @@ export function createStrategy({
     bullishTrend &&
     veryOverheated
   ) {
+
     label =
       "強い上昇・過熱警戒";
 
@@ -891,6 +1010,7 @@ export function createStrategy({
     bullishTrend &&
     overheated
   ) {
+
     label =
       "上昇トレンド・押し目待ち";
 
@@ -901,6 +1021,7 @@ export function createStrategy({
     trendScore >= 70 &&
     entryScore >= 70
   ) {
+
     label =
       "買い候補";
 
@@ -911,6 +1032,7 @@ export function createStrategy({
     trendScore >= 70 &&
     entryScore < 70
   ) {
+
     label =
       "強いが待ち";
 
@@ -921,6 +1043,7 @@ export function createStrategy({
     Number.isFinite(ma25) &&
     latestClose < ma25
   ) {
+
     label =
       "下落警戒";
 
@@ -928,6 +1051,7 @@ export function createStrategy({
       "danger";
 
   } else {
+
     label =
       "様子見";
 
@@ -937,15 +1061,19 @@ export function createStrategy({
 
 
   // =====================================
-  // 14. コメント
+  // 15. コメント
   // =====================================
 
   const roundedEntryLow =
-    Math.round(entryLow);
+    Math.round(
+      entryLow
+    );
 
 
   const roundedEntryHigh =
-    Math.round(entryHigh);
+    Math.round(
+      entryHigh
+    );
 
 
   const roundedSupport =
@@ -971,6 +1099,7 @@ export function createStrategy({
     trendScore >= 75 &&
     entryScore < 60
   ) {
+
     action =
       `トレンド自体は強い一方、現在位置からのエントリー条件はまだ良くありません。` +
       `${roundedEntryLow.toLocaleString("ja-JP")}～${roundedEntryHigh.toLocaleString("ja-JP")}円付近までの押し、または反発確認を待つ判断です。`;
@@ -979,6 +1108,7 @@ export function createStrategy({
     trendScore >= 70 &&
     entryScore >= 70
   ) {
+
     action =
       `トレンドとエントリー条件の両方が比較的良好です。` +
       `${roundedEntryLow.toLocaleString("ja-JP")}～${roundedEntryHigh.toLocaleString("ja-JP")}円付近を分割エントリー候補とします。`;
@@ -987,6 +1117,7 @@ export function createStrategy({
     bullishTrend &&
     overheated
   ) {
+
     action =
       `上昇トレンドは維持していますが短期的に過熱しています。` +
       `現在値を追いかけず、${roundedEntryLow.toLocaleString("ja-JP")}～${roundedEntryHigh.toLocaleString("ja-JP")}円付近への押しを待つ判断です。`;
@@ -995,10 +1126,12 @@ export function createStrategy({
     Number.isFinite(ma25) &&
     latestClose < ma25
   ) {
+
     action =
       "25日線を下回っているため、現時点では底打ち確認を優先します。サポートでの反発や移動平均線の回復を確認してからの方が安全です。";
 
   } else {
+
     action =
       `方向感が十分に揃っていません。` +
       `${roundedEntryLow.toLocaleString("ja-JP")}～${roundedEntryHigh.toLocaleString("ja-JP")}円付近を候補とし、反発確認を優先します。`;
@@ -1008,6 +1141,7 @@ export function createStrategy({
   if (
     roundedSupport !== null
   ) {
+
     action +=
       ` 直近サポートは約${roundedSupport.toLocaleString("ja-JP")}円です。`;
   }
@@ -1018,13 +1152,14 @@ export function createStrategy({
     resistanceDistancePercent !== null &&
     resistanceDistancePercent <= 5
   ) {
+
     action +=
       ` 上値は約${roundedResistance.toLocaleString("ja-JP")}円付近のレジスタンスに注意します。`;
   }
 
 
   // =====================================
-  // 15. 理由・注意点を統合
+  // 16. 理由・注意点
   // =====================================
 
   const reasons = [
@@ -1040,7 +1175,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 16. 星評価
+  // 17. 星評価
   // =====================================
 
   const stars =
@@ -1056,12 +1191,12 @@ export function createStrategy({
 
 
   // =====================================
-  // 17. 戻り値
+  // 18. 戻り値
   // =====================================
 
   return {
-    score,
 
+    score,
     trendScore,
     entryScore,
 
@@ -1071,10 +1206,13 @@ export function createStrategy({
     className,
 
     action,
-    aiComment: action,
+    aiComment:
+      action,
 
     reasons,
-    strengths: reasons,
+    strengths:
+      reasons,
+
     cautions,
 
     trendReasons,
@@ -1103,7 +1241,22 @@ export function createStrategy({
     loss100Swing,
 
     allowedLoss,
+
     recommendedShares,
-    requiredCapital
+    requiredCapital,
+
+    // 新しい100株リスク情報
+
+    requiredCapitalFor100,
+
+    maxRiskPerShareFor100,
+
+    maxAllowedStopFor100,
+
+    minimumLotRiskMultiple,
+
+    minimumLotCapitalRiskPercent,
+
+    canTradeMinimumLot
   };
 }
