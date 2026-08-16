@@ -15,7 +15,9 @@ export function createStrategy({
   recent20High,
   supportResistance,
   capital,
-  riskPercent
+  riskPercent,
+  tradeMode = "margin",
+  marginRate = 30
 }) {
 
   // =====================================
@@ -27,6 +29,33 @@ export function createStrategy({
     atr14 > 0
       ? atr14
       : latestClose * 0.03;
+
+
+  const safeCapital =
+    Number.isFinite(capital) &&
+    capital > 0
+      ? capital
+      : 0;
+
+
+  const safeRiskPercent =
+    Number.isFinite(riskPercent) &&
+    riskPercent > 0
+      ? riskPercent
+      : 1;
+
+
+  const safeTradeMode =
+    tradeMode === "cash"
+      ? "cash"
+      : "margin";
+
+
+  const safeMarginRate =
+    Number.isFinite(marginRate) &&
+    marginRate > 0
+      ? marginRate
+      : 30;
 
 
   const nearestSupport =
@@ -111,11 +140,6 @@ export function createStrategy({
     rsi14 >= 80;
 
 
-  const oversold =
-    Number.isFinite(rsi14) &&
-    rsi14 <= 30;
-
-
   const macdBullish =
     Number.isFinite(latestMacd) &&
     Number.isFinite(latestSignal) &&
@@ -139,13 +163,9 @@ export function createStrategy({
   const trendCautions = [];
 
 
-  if (
-    Number.isFinite(ma5)
-  ) {
+  if (Number.isFinite(ma5)) {
 
-    if (
-      latestClose > ma5
-    ) {
+    if (latestClose > ma5) {
 
       trendScore += 10;
 
@@ -169,9 +189,7 @@ export function createStrategy({
     Number.isFinite(ma25)
   ) {
 
-    if (
-      ma5 > ma25
-    ) {
+    if (ma5 > ma25) {
 
       trendScore += 15;
 
@@ -195,9 +213,7 @@ export function createStrategy({
     Number.isFinite(ma75)
   ) {
 
-    if (
-      mediumBullish
-    ) {
+    if (mediumBullish) {
 
       trendScore += 10;
 
@@ -216,13 +232,9 @@ export function createStrategy({
   }
 
 
-  if (
-    Number.isFinite(ma200)
-  ) {
+  if (Number.isFinite(ma200)) {
 
-    if (
-      longBullish
-    ) {
+    if (longBullish) {
 
       trendScore += 5;
 
@@ -241,9 +253,7 @@ export function createStrategy({
   }
 
 
-  if (
-    crossSignal === "golden"
-  ) {
+  if (crossSignal === "golden") {
 
     trendScore += 8;
 
@@ -251,9 +261,7 @@ export function createStrategy({
       "5日線と25日線のゴールデンクロスが発生しています"
     );
 
-  } else if (
-    crossSignal === "dead"
-  ) {
+  } else if (crossSignal === "dead") {
 
     trendScore -= 8;
 
@@ -268,9 +276,7 @@ export function createStrategy({
     Number.isFinite(latestSignal)
   ) {
 
-    if (
-      macdBullish
-    ) {
+    if (macdBullish) {
 
       trendScore += 10;
 
@@ -295,9 +301,7 @@ export function createStrategy({
     )
   ) {
 
-    if (
-      histogramPositive
-    ) {
+    if (histogramPositive) {
 
       trendScore += 5;
 
@@ -316,13 +320,9 @@ export function createStrategy({
   }
 
 
-  if (
-    Number.isFinite(volumeRatio)
-  ) {
+  if (Number.isFinite(volumeRatio)) {
 
-    if (
-      volumeRatio >= 2
-    ) {
+    if (volumeRatio >= 2) {
 
       trendScore += 8;
 
@@ -330,9 +330,7 @@ export function createStrategy({
         `出来高が20日平均の${volumeRatio.toFixed(1)}倍に急増しています`
       );
 
-    } else if (
-      volumeRatio >= 1.3
-    ) {
+    } else if (volumeRatio >= 1.3) {
 
       trendScore += 4;
 
@@ -340,9 +338,7 @@ export function createStrategy({
         `出来高が20日平均の${volumeRatio.toFixed(1)}倍です`
       );
 
-    } else if (
-      volumeRatio < 0.7
-    ) {
+    } else if (volumeRatio < 0.7) {
 
       trendScore -= 5;
 
@@ -358,9 +354,7 @@ export function createStrategy({
       0,
       Math.min(
         100,
-        Math.round(
-          trendScore
-        )
+        Math.round(trendScore)
       )
     );
 
@@ -375,13 +369,9 @@ export function createStrategy({
   const entryCautions = [];
 
 
-  if (
-    Number.isFinite(rsi14)
-  ) {
+  if (Number.isFinite(rsi14)) {
 
-    if (
-      rsi14 >= 80
-    ) {
+    if (rsi14 >= 80) {
 
       entryScore -= 30;
 
@@ -389,9 +379,7 @@ export function createStrategy({
         `RSIが${rsi14.toFixed(1)}で非常に過熱しています`
       );
 
-    } else if (
-      rsi14 >= 70
-    ) {
+    } else if (rsi14 >= 70) {
 
       entryScore -= 20;
 
@@ -410,9 +398,7 @@ export function createStrategy({
         "RSIは極端な過熱感のない水準です"
       );
 
-    } else if (
-      rsi14 <= 30
-    ) {
+    } else if (rsi14 <= 30) {
 
       entryScore -= 5;
 
@@ -565,9 +551,7 @@ export function createStrategy({
   }
 
 
-  if (
-    bullishTrend
-  ) {
+  if (bullishTrend) {
 
     entryScore += 8;
 
@@ -577,10 +561,7 @@ export function createStrategy({
   }
 
 
-  if (
-    macdBullish
-  ) {
-
+  if (macdBullish) {
     entryScore += 5;
   }
 
@@ -590,9 +571,7 @@ export function createStrategy({
       0,
       Math.min(
         100,
-        Math.round(
-          entryScore
-        )
+        Math.round(entryScore)
       )
     );
 
@@ -609,7 +588,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 6. 買い候補価格
+  // 6. 買い候補
   // =====================================
 
   const usableSupport =
@@ -621,9 +600,7 @@ export function createStrategy({
   let entryAnchor;
 
 
-  if (
-    usableSupport
-  ) {
+  if (usableSupport) {
 
     entryAnchor =
       supportPrice;
@@ -663,7 +640,6 @@ export function createStrategy({
     entryHigh <
     entryLow
   ) {
-
     entryHigh =
       entryLow;
   }
@@ -683,9 +659,7 @@ export function createStrategy({
   let shortStop;
 
 
-  if (
-    usableSupport
-  ) {
+  if (usableSupport) {
 
     shortStop =
       Math.max(
@@ -783,7 +757,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 9. 利確①
+  // 9. 利確
   // =====================================
 
   const minimumTarget1 =
@@ -823,10 +797,6 @@ export function createStrategy({
   }
 
 
-  // =====================================
-  // 10. 利確②
-  // =====================================
-
   const target2 =
     Math.max(
       target1 +
@@ -839,7 +809,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 11. リスクリワード
+  // 10. リスクリワード
   // =====================================
 
   const riskReward1 =
@@ -859,7 +829,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 12. 資金管理
+  // 11. リスク管理
   // =====================================
 
   const loss100Short =
@@ -872,23 +842,10 @@ export function createStrategy({
     100;
 
 
+  // 100株建てた場合の建玉金額
   const minimumLotTradeValue =
     entryCenter *
     100;
-
-
-  const safeCapital =
-    Number.isFinite(capital) &&
-    capital > 0
-      ? capital
-      : 0;
-
-
-  const safeRiskPercent =
-    Number.isFinite(riskPercent) &&
-    riskPercent > 0
-      ? riskPercent
-      : 1;
 
 
   const allowedLoss =
@@ -915,10 +872,6 @@ export function createStrategy({
       : 0;
 
 
-  // 適正株数が0株なら
-  // 「必要資金0円」という
-  // 誤解を招く表示を作らない
-
   const requiredCapital =
     recommendedShares > 0
       ? recommendedShares *
@@ -927,7 +880,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 13. 100株で取引するための必要条件
+  // 12. 100株でリスク基準を守る条件
   // =====================================
 
   const requiredCapitalFor100 =
@@ -979,20 +932,41 @@ export function createStrategy({
 
 
   // =====================================
-  // 14. 資金面の追加指標
+  // 13. 現物 / 信用の必要資金
   // =====================================
 
-  // 現金100%で100株を買う場合、
-  // 現在の入力資金で足りるか
+  // 現物なら建玉金額そのものが必要
+  const requiredCashFor100 =
+    minimumLotTradeValue;
+
+
+  // 信用なら入力した保証金率で概算
+  const requiredMarginFor100 =
+    minimumLotTradeValue *
+    (
+      safeMarginRate /
+      100
+    );
+
+
+  const minimumRequiredFunds =
+    safeTradeMode === "cash"
+      ? requiredCashFor100
+      : requiredMarginFor100;
+
 
   const canAffordMinimumLot =
-    safeCapital > 0 &&
-    minimumLotTradeValue <=
-    safeCapital;
+    safeCapital >=
+    minimumRequiredFunds;
 
 
-  // 100株の売買代金が
-  // 入力資金の何倍か
+  const fundingShortfall =
+    Math.max(
+      0,
+      minimumRequiredFunds -
+      safeCapital
+    );
+
 
   const minimumLotCapitalMultiple =
     safeCapital > 0
@@ -1001,8 +975,15 @@ export function createStrategy({
       : null;
 
 
+  const requiredFundsCapitalMultiple =
+    safeCapital > 0
+      ? minimumRequiredFunds /
+        safeCapital
+      : null;
+
+
   // =====================================
-  // 15. 判定ラベル
+  // 14. 判定ラベル
   // =====================================
 
   let label;
@@ -1075,7 +1056,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 16. コメント
+  // 15. AIコメント
   // =====================================
 
   const roundedEntryLow =
@@ -1173,7 +1154,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 17. 理由・注意点
+  // 16. 理由・注意点
   // =====================================
 
   const reasons = [
@@ -1188,10 +1169,6 @@ export function createStrategy({
   ];
 
 
-  // =====================================
-  // 18. 星評価
-  // =====================================
-
   const stars =
     Math.max(
       1,
@@ -1205,7 +1182,7 @@ export function createStrategy({
 
 
   // =====================================
-  // 19. 戻り値
+  // 17. 戻り値
   // =====================================
 
   return {
@@ -1257,31 +1234,37 @@ export function createStrategy({
     allowedLoss,
 
     recommendedShares,
-
     requiredCapital,
 
-    // 100株の売買金額
-
+    // 建玉
     minimumLotTradeValue,
 
-    // 100株リスク関連
-
+    // リスク
     requiredCapitalFor100,
-
     maxRiskPerShareFor100,
-
     maxAllowedStopFor100,
-
     minimumLotRiskMultiple,
-
     minimumLotCapitalRiskPercent,
-
     canTradeMinimumLot,
 
-    // 資金面
+    // 取引方式
+    tradeMode:
+      safeTradeMode,
+
+    marginRate:
+      safeMarginRate,
+
+    requiredCashFor100,
+    requiredMarginFor100,
+
+    minimumRequiredFunds,
 
     canAffordMinimumLot,
 
-    minimumLotCapitalMultiple
+    fundingShortfall,
+
+    minimumLotCapitalMultiple,
+
+    requiredFundsCapitalMultiple
   };
 }
