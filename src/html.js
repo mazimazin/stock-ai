@@ -41,10 +41,12 @@ export function createHtml({
     change !== null &&
     change >= 0;
 
+
   const changeClass =
     isPositive
       ? "positive"
       : "negative";
+
 
   const changeSign =
     isPositive
@@ -53,15 +55,64 @@ export function createHtml({
 
 
   const trendScore =
-    Number.isFinite(strategy.trendScore)
+    Number.isFinite(
+      strategy.trendScore
+    )
       ? strategy.trendScore
       : strategy.score;
 
 
   const entryScore =
-    Number.isFinite(strategy.entryScore)
+    Number.isFinite(
+      strategy.entryScore
+    )
       ? strategy.entryScore
       : strategy.score;
+
+
+  // =====================================
+  // 最低売買単位100株のリスク判定
+  // =====================================
+
+  const minimumLotLoss =
+    Number.isFinite(
+      strategy.loss100Short
+    )
+      ? strategy.loss100Short
+      : null;
+
+
+  const allowedLoss =
+    Number.isFinite(
+      strategy.allowedLoss
+    )
+      ? strategy.allowedLoss
+      : null;
+
+
+  const minimumLotRiskExceeded =
+    minimumLotLoss !== null &&
+    allowedLoss !== null &&
+    allowedLoss > 0 &&
+    minimumLotLoss > allowedLoss;
+
+
+  const minimumLotRiskMultiple =
+    minimumLotRiskExceeded
+      ? minimumLotLoss /
+        allowedLoss
+      : null;
+
+
+  const minimumLotCapitalRiskPercent =
+    minimumLotLoss !== null &&
+    Number.isFinite(capital) &&
+    capital > 0
+      ? (
+          minimumLotLoss /
+          capital
+        ) * 100
+      : null;
 
 
   const rows =
@@ -74,11 +125,13 @@ export function createHtml({
             price.O
           );
 
+
         const high =
           Number(
             price.AdjH ??
             price.H
           );
+
 
         const low =
           Number(
@@ -86,11 +139,13 @@ export function createHtml({
             price.L
           );
 
+
         const close =
           Number(
             price.AdjC ??
             price.C
           );
+
 
         const volume =
           Number(
@@ -103,27 +158,39 @@ export function createHtml({
           <tr>
 
             <td>
-              ${escapeHtml(price.Date)}
+              ${escapeHtml(
+                price.Date
+              )}
             </td>
 
             <td>
-              ${formatNumber(open)}
+              ${formatNumber(
+                open
+              )}
             </td>
 
             <td>
-              ${formatNumber(high)}
+              ${formatNumber(
+                high
+              )}
             </td>
 
             <td>
-              ${formatNumber(low)}
+              ${formatNumber(
+                low
+              )}
             </td>
 
             <td class="close">
-              ${formatNumber(close)}
+              ${formatNumber(
+                close
+              )}
             </td>
 
             <td>
-              ${formatNumber(volume)}
+              ${formatNumber(
+                volume
+              )}
             </td>
 
           </tr>
@@ -133,19 +200,29 @@ export function createHtml({
 
 
   const reasonItems =
-    (strategy.reasons || [])
+    (
+      strategy.reasons ||
+      []
+    )
       .map(
         (reason) =>
-          `<li>${escapeHtml(reason)}</li>`
+          `<li>${escapeHtml(
+            reason
+          )}</li>`
       )
       .join("");
 
 
   const cautionItems =
-    (strategy.cautions || [])
+    (
+      strategy.cautions ||
+      []
+    )
       .map(
         (reason) =>
-          `<li>${escapeHtml(reason)}</li>`
+          `<li>${escapeHtml(
+            reason
+          )}</li>`
       )
       .join("");
 
@@ -476,8 +553,95 @@ export function createHtml({
     }
 
 
-    .table-wrap {
-      overflow-x: auto;
+    /* ================================= */
+    /* リスク警告                        */
+    /* ================================= */
+
+    .risk-warning {
+      margin-top: 18px;
+      margin-bottom: 20px;
+
+      padding: 20px;
+
+      border:
+        2px solid #ef4444;
+
+      border-radius: 14px;
+
+      background:
+        rgba(239, 68, 68, 0.12);
+    }
+
+
+    .risk-warning-title {
+      color: #f87171;
+
+      font-size: 20px;
+      font-weight: 900;
+    }
+
+
+    .risk-warning-main {
+      margin-top: 12px;
+
+      color: #fca5a5;
+
+      font-size: 16px;
+      font-weight: 700;
+
+      line-height: 1.7;
+    }
+
+
+    .risk-warning-grid {
+      display: grid;
+
+      grid-template-columns:
+        repeat(
+          auto-fit,
+          minmax(170px, 1fr)
+        );
+
+      gap: 10px;
+
+      margin-top: 15px;
+    }
+
+
+    .risk-warning-box {
+      padding: 12px;
+
+      border-radius: 10px;
+
+      background:
+        rgba(15, 23, 42, 0.7);
+    }
+
+
+    .risk-warning-label {
+      color: #94a3b8;
+
+      font-size: 12px;
+    }
+
+
+    .risk-warning-value {
+      margin-top: 4px;
+
+      color: #f87171;
+
+      font-size: 20px;
+      font-weight: 900;
+    }
+
+
+    .risk-warning-note {
+      margin-top: 14px;
+
+      color: #fca5a5;
+
+      font-size: 13px;
+      line-height: 1.7;
     }
 
 
@@ -487,6 +651,11 @@ export function createHtml({
       min-width: 680px;
 
       border-collapse: collapse;
+    }
+
+
+    .table-wrap {
+      overflow-x: auto;
     }
 
 
@@ -528,9 +697,9 @@ export function createHtml({
     }
 
 
-    /* ============================= */
-    /* メインAI評価                   */
-    /* ============================= */
+    /* ================================= */
+    /* AI評価                            */
+    /* ================================= */
 
     .simple-card {
       padding: 30px;
@@ -630,15 +799,14 @@ export function createHtml({
     }
 
 
-    /* ============================= */
-    /* 3スコア                       */
-    /* ============================= */
-
     .score-breakdown {
       display: grid;
 
       grid-template-columns:
-        repeat(2, 1fr);
+        repeat(
+          2,
+          1fr
+        );
 
       gap: 9px;
 
@@ -652,7 +820,12 @@ export function createHtml({
       border-radius: 10px;
 
       background:
-        rgba(15, 23, 42, 0.55);
+        rgba(
+          15,
+          23,
+          42,
+          0.55
+        );
     }
 
 
@@ -845,6 +1018,13 @@ export function createHtml({
       .simple-box-value {
         font-size: 21px;
       }
+
+
+      .score-breakdown {
+        grid-template-columns:
+          1fr;
+      }
+
     }
 
   </style>
@@ -863,8 +1043,10 @@ export function createHtml({
 
 
     <div class="code">
+
       証券コード：
       ${escapeHtml(inputCode)}
+
     </div>
 
 
@@ -876,7 +1058,9 @@ export function createHtml({
       <input
         type="text"
         name="code"
-        value="${escapeHtml(inputCode)}"
+        value="${escapeHtml(
+          inputCode
+        )}"
         placeholder="証券コード"
         maxlength="5"
       >
@@ -885,7 +1069,9 @@ export function createHtml({
       <input
         type="number"
         name="capital"
-        value="${Math.round(capital)}"
+        value="${Math.round(
+          capital
+        )}"
         placeholder="投資資金"
         min="0"
         step="10000"
@@ -920,27 +1106,44 @@ export function createHtml({
       <div class="simple-price-row">
 
         <span class="date">
+
           最新取得日：
-          ${escapeHtml(latest.Date)}
+          ${escapeHtml(
+            latest.Date
+          )}
+
         </span>
 
 
         <span class="simple-current-price">
-          ${formatNumber(latestClose)}円
+
+          ${formatNumber(
+            latestClose
+          )}円
+
         </span>
 
 
-        <span class="change ${changeClass}">
+        <span
+          class="
+            change
+            ${changeClass}
+          "
+        >
 
           ${
             change !== null
-              ? `${changeSign}${formatNumber(change)}円`
+              ? `${changeSign}${formatNumber(
+                  change
+                )}円`
               : "-"
           }
 
           ${
             changePercent !== null
-              ? `（${changeSign}${changePercent.toFixed(2)}%）`
+              ? `（${changeSign}${changePercent.toFixed(
+                  2
+                )}%）`
               : ""
           }
 
@@ -965,7 +1168,11 @@ export function createHtml({
 
 
           <div class="simple-label">
-            ${escapeHtml(strategy.label)}
+
+            ${escapeHtml(
+              strategy.label
+            )}
+
           </div>
 
 
@@ -1016,13 +1223,23 @@ export function createHtml({
         <div class="simple-main">
 
 
-          <div class="simple-box simple-box-wide">
+          <div
+            class="
+              simple-box
+              simple-box-wide
+            "
+          >
 
             <div class="simple-box-label">
               買い候補
             </div>
 
-            <div class="simple-box-value entry">
+            <div
+              class="
+                simple-box-value
+                entry
+              "
+            >
 
               ${formatNumber(
                 strategy.entryLow
@@ -1045,7 +1262,12 @@ export function createHtml({
               損切り目安
             </div>
 
-            <div class="simple-box-value short-stop">
+            <div
+              class="
+                simple-box-value
+                short-stop
+              "
+            >
 
               ${formatNumber(
                 strategy.shortStop
@@ -1062,7 +1284,12 @@ export function createHtml({
               利確目安
             </div>
 
-            <div class="simple-box-value target">
+            <div
+              class="
+                simple-box-value
+                target
+              "
+            >
 
               ${formatNumber(
                 strategy.target1
@@ -1083,6 +1310,7 @@ export function createHtml({
         <div class="ai-comment-title">
           AIコメント
         </div>
+
 
         <div>
 
@@ -1340,6 +1568,136 @@ export function createHtml({
       </h2>
 
 
+      ${
+        minimumLotRiskExceeded
+          ? `
+            <div class="risk-warning">
+
+
+              <div class="risk-warning-title">
+
+                ⚠ 100株では
+                リスク上限を超えます
+
+              </div>
+
+
+              <div class="risk-warning-main">
+
+                現在設定している
+                「1回の許容損失
+                ${riskPercent}%」
+                では、
+
+                日本株の最低売買単位
+                100株を取引した場合の
+                損失想定が
+                許容範囲を超えています。
+
+              </div>
+
+
+              <div class="risk-warning-grid">
+
+
+                <div class="risk-warning-box">
+
+                  <div class="risk-warning-label">
+                    100株の短期損失
+                  </div>
+
+                  <div class="risk-warning-value">
+
+                    ${formatNumber(
+                      minimumLotLoss
+                    )}円
+
+                  </div>
+
+                </div>
+
+
+                <div class="risk-warning-box">
+
+                  <div class="risk-warning-label">
+                    許容損失
+                  </div>
+
+                  <div class="risk-warning-value">
+
+                    ${formatNumber(
+                      allowedLoss
+                    )}円
+
+                  </div>
+
+                </div>
+
+
+                <div class="risk-warning-box">
+
+                  <div class="risk-warning-label">
+                    許容損失に対して
+                  </div>
+
+                  <div class="risk-warning-value">
+
+                    約${
+                      minimumLotRiskMultiple
+                        .toFixed(1)
+                    }倍
+
+                  </div>
+
+                </div>
+
+
+                <div class="risk-warning-box">
+
+                  <div class="risk-warning-label">
+                    投資資金に対するリスク
+                  </div>
+
+                  <div class="risk-warning-value">
+
+                    ${
+                      Number.isFinite(
+                        minimumLotCapitalRiskPercent
+                      )
+                        ? minimumLotCapitalRiskPercent
+                            .toFixed(1)
+                        : "-"
+                    }%
+
+                  </div>
+
+                </div>
+
+
+              </div>
+
+
+              <div class="risk-warning-note">
+
+                この条件では、
+                100株単位で取引すると
+                設定したリスク管理基準に
+                収まりません。
+
+                損切り位置を近づける、
+                投資資金を増やす、
+                または取引を見送るなどの
+                判断が必要です。
+
+              </div>
+
+
+            </div>
+          `
+          : ""
+      }
+
+
       <div class="risk-grid">
 
 
@@ -1417,7 +1775,8 @@ export function createHtml({
         1回の許容損失率
         ${riskPercent}%で計算しています。
 
-        日本株の100株単位に切り下げています。
+        日本株の100株単位に
+        切り下げています。
 
       </div>
 
@@ -1465,7 +1824,11 @@ export function createHtml({
 
 
       <div class="chart-wrap">
-        ${createPriceChart(chartData)}
+
+        ${createPriceChart(
+          chartData
+        )}
+
       </div>
 
     </section>
@@ -1481,8 +1844,13 @@ export function createHtml({
         出来高
       </h2>
 
+
       <div class="chart-wrap">
-        ${createVolumeChart(chartData)}
+
+        ${createVolumeChart(
+          chartData
+        )}
+
       </div>
 
     </section>
@@ -1513,7 +1881,11 @@ export function createHtml({
 
 
       <div class="chart-wrap">
-        ${createMacdChart(chartData)}
+
+        ${createMacdChart(
+          chartData
+        )}
+
       </div>
 
     </section>
@@ -1535,25 +1907,33 @@ export function createHtml({
 
         ${detailBox(
           "5日移動平均",
-          `${formatNumber(ma5)}円`
+          `${formatNumber(
+            ma5
+          )}円`
         )}
 
 
         ${detailBox(
           "25日移動平均",
-          `${formatNumber(ma25)}円`
+          `${formatNumber(
+            ma25
+          )}円`
         )}
 
 
         ${detailBox(
           "75日移動平均",
-          `${formatNumber(ma75)}円`
+          `${formatNumber(
+            ma75
+          )}円`
         )}
 
 
         ${detailBox(
           "200日移動平均",
-          `${formatNumber(ma200)}円`
+          `${formatNumber(
+            ma200
+          )}円`
         )}
 
 
@@ -1591,8 +1971,12 @@ export function createHtml({
 
         ${detailBox(
           "出来高倍率",
-          Number.isFinite(volumeRatio)
-            ? `${volumeRatio.toFixed(2)}倍`
+          Number.isFinite(
+            volumeRatio
+          )
+            ? `${volumeRatio.toFixed(
+                2
+              )}倍`
             : "-"
         )}
 
@@ -1651,7 +2035,7 @@ export function createHtml({
 
 
     <!-- ================================= -->
-    <!-- 最近10日                          -->
+    <!-- 最近10営業日                      -->
     <!-- ================================= -->
 
     <section class="card">
@@ -1699,7 +2083,9 @@ export function createHtml({
 
 
           <tbody>
+
             ${rows}
+
           </tbody>
 
         </table>
@@ -1712,7 +2098,8 @@ export function createHtml({
         J-Quantsで取得可能な日付の
         データを使用しています。
 
-        無料プランでは現在価格ではありません。
+        無料プランでは
+        現在価格ではありません。
 
       </div>
 
@@ -1741,11 +2128,19 @@ function detailBox(
     <div class="detail-item">
 
       <div class="detail-label">
-        ${escapeHtml(label)}
+
+        ${escapeHtml(
+          label
+        )}
+
       </div>
 
       <div class="detail-value">
-        ${escapeHtml(value)}
+
+        ${escapeHtml(
+          value
+        )}
+
       </div>
 
     </div>
@@ -1763,7 +2158,11 @@ function strategyBox(
     <div class="strategy-item">
 
       <div class="detail-label">
-        ${escapeHtml(label)}
+
+        ${escapeHtml(
+          label
+        )}
+
       </div>
 
       <div
@@ -1772,7 +2171,11 @@ function strategyBox(
           ${className}
         "
       >
-        ${escapeHtml(value)}
+
+        ${escapeHtml(
+          value
+        )}
+
       </div>
 
     </div>
@@ -1784,7 +2187,9 @@ function strategyBox(
 /* 株価チャート                          */
 /* ===================================== */
 
-function createPriceChart(data) {
+function createPriceChart(
+  data
+) {
 
   const values =
     data
@@ -1817,6 +2222,7 @@ function createPriceChart(data) {
 
   const width =
     900;
+
 
   const height =
     360;
@@ -1903,7 +2309,10 @@ function createPriceChart(data) {
     (key) =>
       data
         .map(
-          (item, index) => {
+          (
+            item,
+            index
+          ) => {
 
             if (
               !Number.isFinite(
@@ -1913,8 +2322,11 @@ function createPriceChart(data) {
               return null;
             }
 
+
             return `${
-              x(index).toFixed(1)
+              x(
+                index
+              ).toFixed(1)
             },${
               y(
                 item[key]
@@ -1956,7 +2368,11 @@ function createPriceChart(data) {
 
 
       <polyline
-        points="${makePoints("close")}"
+        points="${
+          makePoints(
+            "close"
+          )
+        }"
         fill="none"
         stroke="#e2e8f0"
         stroke-width="3"
@@ -1964,7 +2380,11 @@ function createPriceChart(data) {
 
 
       <polyline
-        points="${makePoints("ma5")}"
+        points="${
+          makePoints(
+            "ma5"
+          )
+        }"
         fill="none"
         stroke="#38bdf8"
         stroke-width="2.5"
@@ -1972,7 +2392,11 @@ function createPriceChart(data) {
 
 
       <polyline
-        points="${makePoints("ma25")}"
+        points="${
+          makePoints(
+            "ma25"
+          )
+        }"
         fill="none"
         stroke="#facc15"
         stroke-width="2.5"
@@ -1980,7 +2404,11 @@ function createPriceChart(data) {
 
 
       <polyline
-        points="${makePoints("ma75")}"
+        points="${
+          makePoints(
+            "ma75"
+          )
+        }"
         fill="none"
         stroke="#a855f7"
         stroke-width="2.2"
@@ -1988,7 +2416,11 @@ function createPriceChart(data) {
 
 
       <polyline
-        points="${makePoints("ma200")}"
+        points="${
+          makePoints(
+            "ma200"
+          )
+        }"
         fill="none"
         stroke="#fb7185"
         stroke-width="2.2"
@@ -2043,7 +2475,10 @@ function makeNestedPoints(
 
   return data
     .map(
-      (item, index) => {
+      (
+        item,
+        index
+      ) => {
 
         const value =
           item[
@@ -2063,9 +2498,13 @@ function makeNestedPoints(
 
 
         return `${
-          x(index).toFixed(1)
+          x(
+            index
+          ).toFixed(1)
         },${
-          y(value).toFixed(1)
+          y(
+            value
+          ).toFixed(1)
         }`;
       }
     )
@@ -2078,10 +2517,13 @@ function makeNestedPoints(
 /* 出来高チャート                        */
 /* ===================================== */
 
-function createVolumeChart(data) {
+function createVolumeChart(
+  data
+) {
 
   const width =
     900;
+
 
   const height =
     250;
@@ -2138,7 +2580,10 @@ function createVolumeChart(data) {
   const bars =
     data
       .map(
-        (item, index) => {
+        (
+          item,
+          index
+        ) => {
 
           const volume =
             Number.isFinite(
@@ -2230,7 +2675,9 @@ function createVolumeChart(data) {
 /* MACDチャート                          */
 /* ===================================== */
 
-function createMacdChart(data) {
+function createMacdChart(
+  data
+) {
 
   const values =
     data
@@ -2259,6 +2706,7 @@ function createMacdChart(data) {
 
   const width =
     900;
+
 
   const height =
     320;
@@ -2347,7 +2795,10 @@ function createMacdChart(data) {
     (key) =>
       data
         .map(
-          (item, index) => {
+          (
+            item,
+            index
+          ) => {
 
             if (
               !Number.isFinite(
@@ -2359,7 +2810,9 @@ function createMacdChart(data) {
 
 
             return `${
-              x(index).toFixed(1)
+              x(
+                index
+              ).toFixed(1)
             },${
               y(
                 item[key]
@@ -2392,14 +2845,21 @@ function createMacdChart(data) {
       <line
         x1="${padding.left}"
         y1="${y(0)}"
-        x2="${width - padding.right}"
+        x2="${
+          width -
+          padding.right
+        }"
         y2="${y(0)}"
         stroke="#64748b"
       />
 
 
       <polyline
-        points="${makePoints("macd")}"
+        points="${
+          makePoints(
+            "macd"
+          )
+        }"
         fill="none"
         stroke="#60a5fa"
         stroke-width="2.5"
@@ -2407,7 +2867,11 @@ function createMacdChart(data) {
 
 
       <polyline
-        points="${makePoints("signal")}"
+        points="${
+          makePoints(
+            "signal"
+          )
+        }"
         fill="none"
         stroke="#f97316"
         stroke-width="2.5"
@@ -2438,7 +2902,8 @@ function createGridLines({
   formatter
 }) {
 
-  const lines = [];
+  const lines =
+    [];
 
 
   for (
@@ -2460,26 +2925,37 @@ function createGridLines({
 
 
     const gridY =
-      y(value);
+      y(
+        value
+      );
 
 
     lines.push(`
       <line
         x1="${padding.left}"
         y1="${gridY}"
-        x2="${width - padding.right}"
+        x2="${
+          width -
+          padding.right
+        }"
         y2="${gridY}"
         stroke="#334155"
       />
 
 
       <text
-        x="${width - padding.right + 8}"
+        x="${
+          width -
+          padding.right +
+          8
+        }"
         y="${gridY + 5}"
         fill="#94a3b8"
         font-size="12"
       >
-        ${formatter(value)}
+        ${formatter(
+          value
+        )}
       </text>
     `);
   }
@@ -2511,7 +2987,10 @@ function createDateLabels(
 
   return data
     .map(
-      (item, index) => {
+      (
+        item,
+        index
+      ) => {
 
         if (
           index %
@@ -2527,13 +3006,18 @@ function createDateLabels(
         return `
           <text
             x="${x(index)}"
-            y="${height - 18}"
+            y="${
+              height -
+              18
+            }"
             fill="#94a3b8"
             font-size="11"
             text-anchor="middle"
           >
             ${escapeHtml(
-              item.date.slice(5)
+              item.date.slice(
+                5
+              )
             )}
           </text>
         `;
