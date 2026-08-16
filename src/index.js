@@ -1,23 +1,14 @@
-import {
-  normalizeNumber,
-  htmlError
-} from "./utils.js";
+import { fetchDailyBars } from "./api.js";
 
 import {
   STOCK_NAMES
 } from "./config.js";
 
 import {
-  fetchDailyBars
-} from "./api.js";
-
-import {
   calculateSMA,
-  calculateSMAAt,
-  calculateBollingerBands,
-  calculateBollingerAt,
-  detectMovingAverageCross,
   calculateRSI,
+  calculateBollingerBands,
+  detectMovingAverageCross,
   calculateATR,
   calculateMACD,
   getLastFinite
@@ -39,80 +30,153 @@ import {
   createRankingResponse
 } from "./ranking.js";
 
+import {
+  normalizeNumber,
+  htmlError
+} from "./utils.js";
+
 
 export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
 
-    if (
-      url.searchParams.get("mode") === "ranking"
-    ) {
-      return createRankingResponse(env);
-    }
-
-
-    const inputCode =
-      (
-        url.searchParams.get("code") ||
-        "285A"
-      )
-        .trim()
-        .toUpperCase();
-
-
-    const capital =
-      normalizeNumber(
-        url.searchParams.get("capital"),
-        1000000
-      );
-
-
-    const riskPercent =
-      normalizeNumber(
-        url.searchParams.get("risk"),
-        1
-      );
-
-
-    const code =
-      inputCode.length === 4
-        ? `${inputCode}0`
-        : inputCode;
-
-
-    const stockName =
-      STOCK_NAMES[inputCode] ||
-      `銘柄コード ${inputCode}`;
-
-
-    if (!env.JQUANTS_API_KEY) {
-      return htmlError(
-        "JQUANTS_API_KEYが設定されていません"
-      );
-    }
-
+  async fetch(
+    request,
+    env
+  ) {
 
     try {
-      const prices =
-        await fetchDailyBars(
-          code,
-          env.JQUANTS_API_KEY
+
+      const url =
+        new URL(
+          request.url
         );
 
 
-      if (prices.length === 0) {
-        return htmlError(
-          `${inputCode}の株価データが見つかりませんでした`
+      // =====================================
+      // ランキング
+      // =====================================
+
+      if (
+        url.searchParams.get(
+          "mode"
+        ) === "ranking"
+      ) {
+
+        const rankingType =
+          url.searchParams.get(
+            "type"
+          ) || "overall";
+
+
+        const allowedTypes = [
+          "overall",
+          "entry",
+          "trend"
+        ];
+
+
+        const safeRankingType =
+          allowedTypes.includes(
+            rankingType
+          )
+            ? rankingType
+            : "overall";
+
+
+        return await createRankingResponse(
+          env,
+          safeRankingType
         );
       }
 
 
-      const closes =
+      // =====================================
+      // 個別銘柄
+      // =====================================
+
+      const inputCode =
+        (
+          url.searchParams.get(
+            "code"
+          ) || "285A"
+        )
+          .trim()
+          .toUpperCase();
+
+
+      const capital =
+        normalizeNumber(
+          url.searchParams.get(
+            "capital"
+          ),
+          1000000
+        );
+
+
+      const riskPercent =
+        normalizeNumber(
+          url.searchParams.get(
+            "risk"
+          ),
+          1
+        );
+
+
+      // =====================================
+      // J-Quants用コード
+      // =====================================
+
+      let apiCode =
+        inputCode;
+
+
+      if (
+        inputCode.length === 4
+      ) {
+        apiCode =
+          `${inputCode}0`;
+      }
+
+
+      // =====================================
+      // 株価取得
+      // =====================================
+
+      const prices =
+        await fetchDailyBars(
+          apiCode,
+          env.JQUANTS_API_KEY
+        );
+
+
+      if (
+        !Array.isArray(
+          prices
+        ) ||
+        prices.length === 0
+      ) {
+        return htmlError(
+          "株価データを取得できませんでした"
+        );
+      }
+
+
+      prices.sort(
+        (a, b) =>
+          new Date(a.Date) -
+          new Date(b.Date)
+      );
+
+
+      // =====================================
+      // OHLCV
+      // =====================================
+
+      const opens =
         prices.map(
           (price) =>
             Number(
-              price.AdjC ??
-              price.C
+              price.AdjO ??
+              price.O
             )
         );
 
@@ -133,6 +197,16 @@ export default {
             Number(
               price.AdjL ??
               price.L
+            )
+        );
+
+
+      const closes =
+        prices.map(
+          (price) =>
+            Number(
+              price.AdjC ??
+              price.C
             )
         );
 
@@ -191,6 +265,10 @@ export default {
             ) * 100
           : null;
 
+
+      // =====================================
+      // テクニカル指標
+      // =====================================
 
       const ma5 =
         calculateSMA(
@@ -275,6 +353,10 @@ export default {
         );
 
 
+      // =====================================
+      // MACD
+      // =====================================
+
       const macdData =
         calculateMACD(
           closes,
@@ -302,11 +384,19 @@ export default {
         );
 
 
+      // =====================================
+      // 直近20日高値
+      // =====================================
+
       const recent20High =
         Math.max(
           ...highs.slice(-20)
         );
 
+
+      // =====================================
+      // サポート・レジスタンス
+      // =====================================
 
       const supportResistance =
         detectSupportResistance(
@@ -315,6 +405,10 @@ export default {
           closes
         );
 
+
+      // =====================================
+      // 戦略
+      // =====================================
 
       const strategy =
         createStrategy({
@@ -346,112 +440,120 @@ export default {
         });
 
 
+      // =====================================
+      // チャート用データ
+      // =====================================
+
+      const chartData =
+        prices.map(
+          (
+            price,
+            index
+          ) => ({
+
+            date:
+              price.Date,
+
+            open:
+              opens[index],
+
+            high:
+              highs[index],
+
+            low:
+              lows[index],
+
+            close:
+              closes[index],
+
+            volume:
+              volumes[index],
+
+            ma5:
+              calculateSMAAt(
+                closes,
+                5,
+                index
+              ),
+
+            ma25:
+              calculateSMAAt(
+                closes,
+                25,
+                index
+              ),
+
+            ma75:
+              calculateSMAAt(
+                closes,
+                75,
+                index
+              ),
+
+            ma200:
+              calculateSMAAt(
+                closes,
+                200,
+                index
+              ),
+
+            bollinger:
+              calculateBollingerAt(
+                closes,
+                20,
+                2,
+                index
+              ),
+
+            macd:
+              macdData
+                .macd[index],
+
+            signal:
+              macdData
+                .signal[index],
+
+            histogram:
+              macdData
+                .histogram[index]
+          })
+        );
+
+
+      // =====================================
+      // 直近10営業日
+      // =====================================
+
       const recentPrices =
         prices
           .slice(-10)
           .reverse();
 
 
-      const chartStart =
-        Math.max(
-          0,
-          prices.length - 60
-        );
+      // =====================================
+      // 銘柄名
+      // =====================================
+
+      const stockName =
+        STOCK_NAMES[
+          inputCode
+        ] ||
+        inputCode;
 
 
-      const chartData =
-        prices
-          .slice(chartStart)
-          .map(
-            (price, index) => {
-              const absoluteIndex =
-                chartStart +
-                index;
+      // =====================================
+      // HTML
+      // =====================================
 
-              return {
-                date:
-                  price.Date,
-
-                open:
-                  Number(
-                    price.AdjO ??
-                    price.O
-                  ),
-
-                close:
-                  closes[
-                    absoluteIndex
-                  ],
-
-                volume:
-                  volumes[
-                    absoluteIndex
-                  ],
-
-                ma5:
-                  calculateSMAAt(
-                    closes,
-                    absoluteIndex,
-                    5
-                  ),
-
-                ma25:
-                  calculateSMAAt(
-                    closes,
-                    absoluteIndex,
-                    25
-                  ),
-
-                ma75:
-                  calculateSMAAt(
-                    closes,
-                    absoluteIndex,
-                    75
-                  ),
-
-                ma200:
-                  calculateSMAAt(
-                    closes,
-                    absoluteIndex,
-                    200
-                  ),
-
-                bollinger:
-                  calculateBollingerAt(
-                    closes,
-                    absoluteIndex,
-                    20,
-                    2
-                  ),
-
-                macd:
-                  macdData.macd[
-                    absoluteIndex
-                  ],
-
-                signal:
-                  macdData.signal[
-                    absoluteIndex
-                  ],
-
-                histogram:
-                  macdData.histogram[
-                    absoluteIndex
-                  ]
-              };
-            }
-          );
-
-
-      return new Response(
+      const html =
         createHtml({
           stockName,
           inputCode,
 
           latest,
           latestClose,
-          previousClose,
 
+          previousClose,
           change,
           changePercent,
 
@@ -469,7 +571,6 @@ export default {
           volumeRatio,
 
           crossSignal,
-
           atr14,
 
           latestMacd,
@@ -483,7 +584,11 @@ export default {
 
           capital,
           riskPercent
-        }),
+        });
+
+
+      return new Response(
+        html,
         {
           headers: {
             "Content-Type":
@@ -495,12 +600,157 @@ export default {
         }
       );
 
+
     } catch (error) {
+
       return htmlError(
         error instanceof Error
           ? error.message
-          : "株価データの取得に失敗しました"
+          : "分析中にエラーが発生しました"
       );
     }
   }
 };
+
+
+// =====================================
+// チャート計算用
+// =====================================
+
+function calculateSMAAt(
+  values,
+  period,
+  index
+) {
+
+  if (
+    index <
+    period - 1
+  ) {
+    return null;
+  }
+
+
+  const slice =
+    values.slice(
+      index -
+      period +
+      1,
+      index + 1
+    );
+
+
+  const valid =
+    slice.filter(
+      Number.isFinite
+    );
+
+
+  if (
+    valid.length !==
+    period
+  ) {
+    return null;
+  }
+
+
+  return (
+    valid.reduce(
+      (sum, value) =>
+        sum + value,
+      0
+    ) /
+    period
+  );
+}
+
+
+function calculateBollingerAt(
+  values,
+  period,
+  multiplier,
+  index
+) {
+
+  if (
+    index <
+    period - 1
+  ) {
+    return {
+      upper: null,
+      middle: null,
+      lower: null
+    };
+  }
+
+
+  const slice =
+    values.slice(
+      index -
+      period +
+      1,
+      index + 1
+    );
+
+
+  const valid =
+    slice.filter(
+      Number.isFinite
+    );
+
+
+  if (
+    valid.length !==
+    period
+  ) {
+    return {
+      upper: null,
+      middle: null,
+      lower: null
+    };
+  }
+
+
+  const middle =
+    valid.reduce(
+      (sum, value) =>
+        sum + value,
+      0
+    ) /
+    period;
+
+
+  const variance =
+    valid.reduce(
+      (sum, value) =>
+        sum +
+        Math.pow(
+          value -
+          middle,
+          2
+        ),
+      0
+    ) /
+    period;
+
+
+  const standardDeviation =
+    Math.sqrt(
+      variance
+    );
+
+
+  return {
+    upper:
+      middle +
+      standardDeviation *
+      multiplier,
+
+    middle,
+
+    lower:
+      middle -
+      standardDeviation *
+      multiplier
+  };
+}
