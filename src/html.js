@@ -828,12 +828,13 @@ export function createHtml({
       color: #cbd5e1;
 
       cursor: pointer;
-            font-weight: 800;
+
+      font-weight: 800;
     }
 
 
     .strength-title {
-      color: #4ade80;
+          color: #4ade80;
     }
 
 
@@ -2125,7 +2126,7 @@ export function createHtml({
 
 
         ${strategyBox(
-          "利確① リスクリワード",
+          "買い候補から利確① RR",
           `1：${formatRatio(
             strategy.riskReward1
           )}`,
@@ -2134,9 +2135,27 @@ export function createHtml({
 
 
         ${strategyBox(
-          "利確② リスクリワード",
+          "買い候補から利確② RR",
           `1：${formatRatio(
             strategy.riskReward2
+          )}`,
+          "target"
+        )}
+
+
+        ${strategyBox(
+          "現在値から利確① RR",
+          `1：${formatRatio(
+            strategy.currentRiskReward1
+          )}`,
+          "target"
+        )}
+
+
+        ${strategyBox(
+          "現在値から利確② RR",
+          `1：${formatRatio(
+            strategy.currentRiskReward2
           )}`,
           "target"
         )}
@@ -2574,7 +2593,6 @@ function createPriceChart(
     1;
 
 
-  // 0円未満にはしない
   const minValue =
     Math.max(
       0,
@@ -2764,7 +2782,8 @@ function createPriceChart(
 
     </svg>
   `;
-}function makeNestedPoints(
+}
+function makeNestedPoints(
   data,
   x,
   y,
