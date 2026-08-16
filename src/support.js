@@ -43,22 +43,19 @@ export function detectSupportResistance(
       closes.length - lookback
     );
 
-  const pivotLevels = [];
+  const candidates = [];
 
 
-  // -----------------------------
-  // 1. 通常のピボット高値・安値
-  // -----------------------------
+  // =============================
+  // 1. 通常のピボット
+  // =============================
 
   for (
-    let i =
-      Math.max(
-        startIndex,
-        pivotWindow
-      );
-    i <
-      closes.length -
-        pivotWindow;
+    let i = Math.max(
+      startIndex,
+      pivotWindow
+    );
+    i < closes.length - pivotWindow;
     i++
   ) {
     const currentLow =
@@ -82,64 +79,58 @@ export function detectSupportResistance(
       offset <= pivotWindow;
       offset++
     ) {
-      const previousLow =
-        lows[i - offset];
-
-      const nextLow =
-        lows[i + offset];
-
-      const previousHigh =
-        highs[i - offset];
-
-      const nextHigh =
-        highs[i + offset];
-
-
       if (
-        Number.isFinite(previousLow) &&
-        currentLow > previousLow
+        Number.isFinite(
+          lows[i - offset]
+        ) &&
+        currentLow >
+          lows[i - offset]
       ) {
         isPivotLow = false;
       }
 
       if (
-        Number.isFinite(nextLow) &&
-        currentLow > nextLow
+        Number.isFinite(
+          lows[i + offset]
+        ) &&
+        currentLow >
+          lows[i + offset]
       ) {
         isPivotLow = false;
       }
 
-
       if (
-        Number.isFinite(previousHigh) &&
-        currentHigh < previousHigh
+        Number.isFinite(
+          highs[i - offset]
+        ) &&
+        currentHigh <
+          highs[i - offset]
       ) {
         isPivotHigh = false;
       }
 
       if (
-        Number.isFinite(nextHigh) &&
-        currentHigh < nextHigh
+        Number.isFinite(
+          highs[i + offset]
+        ) &&
+        currentHigh <
+          highs[i + offset]
       ) {
         isPivotHigh = false;
       }
     }
 
-
     if (isPivotLow) {
-      pivotLevels.push({
+      candidates.push({
         price: currentLow,
-        type: "support",
         index: i,
         source: "pivot"
       });
     }
 
-
     if (isPivotHigh) {
-      pivotLevels.push({
+      candidates.push({
         price: currentHigh,
-        type: "resistance",
         index: i,
         source: "pivot"
       });
@@ -147,16 +138,9 @@ export function detectSupportResistance(
   }
 
 
-  // -----------------------------
-  // 2. 直近価格を追加
-  // -----------------------------
-  //
-  // 最新数日には未来側のローソク足がないため、
-  // 通常のピボット判定だけだと重要な高値・安値を
-  // 拾えない。
-  //
-  // そのため直近の高値・安値も候補に加える。
-  // -----------------------------
+  // =============================
+  // 2. 直近高値・安値
+  // =============================
 
   const recentStart =
     Math.max(
@@ -170,31 +154,21 @@ export function detectSupportResistance(
     i < closes.length;
     i++
   ) {
-    const high =
-      highs[i];
-
-    const low =
-      lows[i];
-
-    if (Number.isFinite(high)) {
-      pivotLevels.push({
-        price: high,
-        type:
-          high > latestClose
-            ? "resistance"
-            : "support",
+    if (
+      Number.isFinite(highs[i])
+    ) {
+      candidates.push({
+        price: highs[i],
         index: i,
         source: "recent"
       });
     }
 
-    if (Number.isFinite(low)) {
-      pivotLevels.push({
-        price: low,
-        type:
-          low < latestClose
-            ? "support"
-            : "resistance",
+    if (
+      Number.isFinite(lows[i])
+    ) {
+      candidates.push({
+        price: lows[i],
         index: i,
         source: "recent"
       });
@@ -202,11 +176,15 @@ export function detectSupportResistance(
   }
 
 
-  // -----------------------------
+  // =============================
   // 3. 価格帯をクラスタ化
-  // -----------------------------
-
-  const clusteredLevels = [];
+  // =============================
+  //
+  // support / resistance を
+  // 先に分けないのがポイント。
+  //
+  // 同じ価格帯が重複する問題を防ぐ。
+  // =============================
 
   const tolerance =
     latestClose *
@@ -215,53 +193,50 @@ export function detectSupportResistance(
       100
     );
 
-
-  const sortedPivots =
-    [...pivotLevels].sort(
+  const sortedCandidates =
+    [...candidates].sort(
       (a, b) =>
         a.price - b.price
     );
 
+  const clusters = [];
 
-  for (const pivot of sortedPivots) {
+  for (
+    const candidate of
+    sortedCandidates
+  ) {
     const existing =
-      clusteredLevels.find(
+      clusters.find(
         (level) =>
-          level.type ===
-            pivot.type &&
           Math.abs(
             level.price -
-            pivot.price
+              candidate.price
           ) <= tolerance
       );
 
-
     if (existing) {
-      const totalWeight =
-        existing.weight +
-        1;
+      const newTouches =
+        existing.touches + 1;
 
       existing.price =
         (
           existing.price *
-            existing.weight +
-          pivot.price
+            existing.touches +
+          candidate.price
         ) /
-        totalWeight;
+        newTouches;
 
-      existing.weight =
-        totalWeight;
-
-      existing.touches += 1;
+      existing.touches =
+        newTouches;
 
       existing.lastIndex =
         Math.max(
           existing.lastIndex,
-          pivot.index
+          candidate.index
         );
 
       if (
-        pivot.source ===
+        candidate.source ===
         "recent"
       ) {
         existing.recentTouches +=
@@ -269,35 +244,29 @@ export function detectSupportResistance(
       }
 
     } else {
-      clusteredLevels.push({
+      clusters.push({
         price:
-          pivot.price,
-
-        type:
-          pivot.type,
+          candidate.price,
 
         touches:
           1,
 
         recentTouches:
-          pivot.source ===
+          candidate.source ===
           "recent"
             ? 1
             : 0,
 
-        weight:
-          1,
-
         lastIndex:
-          pivot.index
+          candidate.index
       });
     }
   }
 
 
-  // -----------------------------
-  // 4. 現在値から遠すぎる価格を除外
-  // -----------------------------
+  // =============================
+  // 4. 現在値±15%だけ残す
+  // =============================
 
   const minimumPrice =
     latestClose *
@@ -307,7 +276,6 @@ export function detectSupportResistance(
         100
     );
 
-
   const maximumPrice =
     latestClose *
     (
@@ -316,9 +284,8 @@ export function detectSupportResistance(
         100
     );
 
-
   const nearbyLevels =
-    clusteredLevels
+    clusters
       .filter(
         (level) =>
           level.price >=
@@ -334,15 +301,13 @@ export function detectSupportResistance(
                 level.price -
                 latestClose
               ) /
-                latestClose
+              latestClose
             ) * 100;
-
 
           const age =
             closes.length -
             1 -
             level.lastIndex;
-
 
           const recencyScore =
             Math.max(
@@ -350,13 +315,11 @@ export function detectSupportResistance(
               10 - age
             );
 
-
           const strengthScore =
             level.touches * 3 +
             level.recentTouches * 2 +
             recencyScore -
             distancePercent;
-
 
           return {
             ...level,
@@ -367,11 +330,11 @@ export function detectSupportResistance(
       );
 
 
-  // -----------------------------
-  // 5. サポート
-  // -----------------------------
+  // =============================
+  // 5. サポート候補
+  // =============================
 
-  const supports =
+  const allSupports =
     nearbyLevels
       .filter(
         (level) =>
@@ -380,16 +343,15 @@ export function detectSupportResistance(
       )
       .sort(
         (a, b) => {
-          const scoreDifference =
+          const scoreDiff =
             b.strengthScore -
             a.strengthScore;
 
           if (
-            Math.abs(
-              scoreDifference
-            ) > 1
+            Math.abs(scoreDiff) >
+            1
           ) {
-            return scoreDifference;
+            return scoreDiff;
           }
 
           return (
@@ -397,18 +359,14 @@ export function detectSupportResistance(
             a.price
           );
         }
-      )
-      .slice(
-        0,
-        maxLevels
       );
 
 
-  // -----------------------------
-  // 6. レジスタンス
-  // -----------------------------
+  // =============================
+  // 6. レジスタンス候補
+  // =============================
 
-  const resistances =
+  const allResistances =
     nearbyLevels
       .filter(
         (level) =>
@@ -417,16 +375,15 @@ export function detectSupportResistance(
       )
       .sort(
         (a, b) => {
-          const scoreDifference =
+          const scoreDiff =
             b.strengthScore -
             a.strengthScore;
 
           if (
-            Math.abs(
-              scoreDifference
-            ) > 1
+            Math.abs(scoreDiff) >
+            1
           ) {
-            return scoreDifference;
+            return scoreDiff;
           }
 
           return (
@@ -434,19 +391,62 @@ export function detectSupportResistance(
             b.price
           );
         }
-      )
-      .slice(
-        0,
-        maxLevels
       );
 
 
-  // -----------------------------
-  // 7. 一番近い支持線・抵抗線
-  // -----------------------------
+  // =============================
+  // 7. 重複価格帯を除去
+  // =============================
+
+  const removeDuplicates =
+    (levels) => {
+      const result = [];
+
+      for (const level of levels) {
+        const duplicate =
+          result.some(
+            (existing) =>
+              Math.abs(
+                existing.price -
+                level.price
+              ) <=
+              latestClose *
+                0.005
+          );
+
+        if (!duplicate) {
+          result.push(level);
+        }
+
+        if (
+          result.length >=
+          maxLevels
+        ) {
+          break;
+        }
+      }
+
+      return result;
+    };
+
+
+  const supports =
+    removeDuplicates(
+      allSupports
+    );
+
+  const resistances =
+    removeDuplicates(
+      allResistances
+    );
+
+
+  // =============================
+  // 8. 現在値に一番近いライン
+  // =============================
 
   const nearestSupport =
-    supports.length > 0
+    supports.length
       ? [...supports]
           .sort(
             (a, b) =>
@@ -455,9 +455,8 @@ export function detectSupportResistance(
           )[0]
       : null;
 
-
   const nearestResistance =
-    resistances.length > 0
+    resistances.length
       ? [...resistances]
           .sort(
             (a, b) =>
@@ -467,9 +466,9 @@ export function detectSupportResistance(
       : null;
 
 
-  // -----------------------------
-  // 8. 距離
-  // -----------------------------
+  // =============================
+  // 9. 現在値との距離
+  // =============================
 
   const supportDistancePercent =
     nearestSupport
@@ -481,7 +480,6 @@ export function detectSupportResistance(
           latestClose
         ) * 100
       : null;
-
 
   const resistanceDistancePercent =
     nearestResistance
